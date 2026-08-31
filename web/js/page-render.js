@@ -1,8 +1,14 @@
 /* BUF FMC 大屏 —— SVG 页面渲染器
- * 约定：文字渲染后中心 = 旋转后 AABB 中心。
- *   rot90  AABB = (x, y-w, h, w)   → 中心 (x+h/2, y)          rotate(-90)
- *   rot270 AABB = (x-h, y, h, w)   → 中心 (x-h/2, y+w/2)      rotate(90)
- *   rot0   水平按 align/valign 做锚点。
+ * 文字布局（严格 pencil 语义，fixed-width-height 不换行模式）：
+ * 统一在文字的**渲染 AABB** 内按 textAlign/textAlignVertical 精确布局：
+ *   rot90  AABB = (x, y-w, h, w)   自下而上读    rotate(-90)
+ *   rot270 AABB = (x-h, y, h, w)   自上而下读    rotate(90)
+ *   rot0   AABB = (x, y, w, h)
+ * 锚点/基线：
+ *   align left→AABB.x(anchor=start) center→中心(middle) right→右端(end)
+ *   valign top→基线=AABB.y+0.8×size(dominant-baseline=auto)
+ *          middle→中心(central)  bottom→AABB.y+AABB.h-0.22×size(auto，留 descender)
+ * 旋转文字均为 center/middle：transform=translate(AABB中心) rotate(∓90)。
  */
 (function () {
   const NS = 'http://www.w3.org/2000/svg';
@@ -22,26 +28,32 @@
 
   function buildText(t) {
     const rot = t.rot || 0;
+    const size = t.size || 11;
+    // 渲染 AABB（pencil 实测语义）
+    const aabb = rot === 90 ? { x: t.x, y: t.y - t.w, w: t.h, h: t.w }
+      : rot === 270 ? { x: t.x - t.h, y: t.y, w: t.h, h: t.w }
+      : { x: t.x, y: t.y, w: t.w, h: t.h };
+    const cx = aabb.x + aabb.w / 2, cy = aabb.y + aabb.h / 2;
+
     let anchor, baseline, tx, ty, deg = 0;
     if (rot === 90 || rot === 270) {
+      // pencil 旋转文字均 center/middle，绕 AABB 中心旋转 ∓90
       anchor = 'middle';
       baseline = 'central';
-      if (rot === 90) {
-        tx = t.x + t.h / 2;
-        ty = t.y; // AABB=(x, y-w, h, w) 中心
-        deg = -90;
-      } else {
-        tx = t.x - t.h / 2;
-        ty = t.y + t.w / 2; // AABB=(x-h, y, h, w) 中心
-        deg = 90;
-      }
+      tx = cx; ty = cy;
+      deg = rot === 90 ? -90 : 90;
     } else {
-      anchor = t.align === 'center' ? 'middle' : t.align === 'right' ? 'end' : 'start';
-      if (t.valign === 'middle' || t.valign === 'center') baseline = 'central';
-      else if (t.valign === 'top') baseline = 'hanging';
-      else baseline = 'auto'; // bottom：基线贴盒底
-      tx = t.x + (t.align === 'center' ? t.w / 2 : t.align === 'right' ? t.w : 0);
-      ty = t.y + (t.valign === 'middle' || t.valign === 'center' ? t.h / 2 : t.valign === 'top' ? 0 : t.h);
+      const align = t.align || 'left', valign = t.valign || 'bottom';
+      anchor = align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start';
+      tx = align === 'center' ? cx : align === 'right' ? aabb.x + aabb.w : aabb.x;
+      if (valign === 'middle' || valign === 'center') {
+        baseline = 'central'; ty = cy;
+      } else if (valign === 'top') {
+        // 基线 = 盒顶 + 0.8×size（ ascent 近似，dominant-baseline=auto ）
+        baseline = 'auto'; ty = aabb.y + 0.8 * size;
+      } else { // bottom：留 descender 余量，不侵入下格
+        baseline = 'auto'; ty = aabb.y + aabb.h - 0.22 * size;
+      }
     }
     const e = el('text', {
       x: 0, y: 0,

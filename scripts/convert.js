@@ -287,6 +287,10 @@ function emit(sheetKey, sheetName, built, shapes, frameX, fid) {
 }
 
 // ---- 主流程 ----
+if (require.main !== module) {
+  // 被 require 时（如 gen-pages.js 复用边框几何），不执行副作用主流程
+  module.exports = { parseStyles, parseSheet, build, estW, shapesOf };
+} else {
 const cfg = [
   { key: 'L20', name: 'L20', xml: 'sheet-L20.xml', frameX: 0 },
   { key: 'L20x2', name: 'L20 (2)', xml: 'sheet-L20__2_.xml', frameX: null },
@@ -315,3 +319,4 @@ for (const c of cfg) {
 }
 fs.writeFileSync(path.join(OUT, '_order.json'), JSON.stringify(cfg.map(c => ({ key: c.key, name: c.name, frameX: Math.round(c.frameX), W: +c.sheet.W.toFixed(1), H: +c.sheet.H.toFixed(1), files: c.files })), null, 1));
 console.log(JSON.stringify({ results, order: cfg.map(c => ({ key: c.key, frameX: Math.round(c.frameX) })) }, null, 1));
+}

@@ -1,8 +1,53 @@
 // gen-pages.js — elements-{frame}.json -> web/data/page-{n}.js
 const fs = require('fs'), path = require('path');
+const { parseSheet, build } = require('./convert.js');
 const DATA = path.join(__dirname, '..', 'data');
 const OUT = path.join(__dirname, '..', 'web', 'data');
 fs.mkdirSync(OUT, { recursive: true });
+
+// 整帧边框几何来源：sheet XML（convert.build 的 borderGeo 与 pencil 原型 30-borders 完全一致）
+// 注意：elements-*.json 含 rot-patch 后处理坐标，不可由 convert 主流程重写，故此处仅借用几何计算。
+const SHEET_XML = { L20: 'sheet-L20.xml', L40: 'sheet-L40.xml' };
+function borderGeoOf(frame) {
+  const xml = SHEET_XML[frame];
+  if (!xml) return '';
+  try {
+    return build(parseSheet(path.join(DATA, xml))).borderGeo || '';
+  } catch (e) { return ''; }
+}
+
+/* 解析 "M{x} {y}L{x} {y}..." 串 → 线段数组 */
+function parseGeo(geo) {
+  const segs = [];
+  for (const m of String(geo).matchAll(/M(-?[\d.]+) (-?[\d.]+)L(-?[\d.]+) (-?[\d.]+)/g)) {
+    segs.push([+m[1], +m[2], +m[3], +m[4]]);
+  }
+  return segs;
+}
+const fmt = v => +v.toFixed(2);
+const segToD = s => `M${fmt(s[0])} ${fmt(s[1])}L${fmt(s[2])} ${fmt(s[3])}`;
+
+/* 按上下页分界 midY 切分边框：
+ * - 水平段按其 y 归属（y <= midY 上页，否则下页；与 fills 的 pred 一致）
+ * - 垂直段整体在上/下区内直接归属；跨越 midY 则在 midY 处裁成两段分属两页 */
+function splitBorderGeo(geo, midY) {
+  const top = [], bot = [];
+  for (const [x0, y0, x1, y1] of parseGeo(geo)) {
+    if (Math.abs(y0 - y1) < 0.01) { // 水平段
+      (y0 <= midY ? top : bot).push([x0, y0, x1, y1]);
+    } else { // 垂直段（x0===x1）
+      const ya = Math.min(y0, y1), yb = Math.max(y0, y1);
+      if (yb <= midY) top.push([x0, ya, x1, yb]);
+      else if (ya >= midY) bot.push([x0, ya, x1, yb]);
+      else {
+        top.push([x0, ya, x0, midY]);
+        bot.push([x0, midY, x1, yb]);
+      }
+    }
+  }
+  return [top.map(segToD).join(''), bot.map(segToD).join('')];
+}
+
 
 function siteIdOf(name) { return typeof name === 'string' && name.startsWith('site:') ? name.slice(5).trim() : null; }
 
@@ -64,21 +109,22 @@ function contentVB(page, pad) {
 function splitPages(el, frameName) {
   const banners = findBanners(el, frameName);
   const midY = banners[1].top; // 第二条横幅顶 = 上下分界
-  const mk = (suffix, pageName, pred) => {
+  const [borderTop, borderBottom] = splitBorderGeo(borderGeoOf(frameName), midY);
+  const mk = (suffix, pageName, pred, borderGeo) => {
     const fills = el.fills.filter(pred).map((f, i) => ({ ...f, id: 'f' + suffix + '_' + i }));
     const page = {
       id: frameName + '-' + suffix, name: frameName + '-' + pageName,
       frame: frameName, W: el.W, H: el.H,
       fills,
       texts: el.texts.filter(pred).map((t, i) => ({ ...t, id: 't' + suffix + '_' + i })),
-      borderGeo: el.borderGeo || '',
+      borderGeo: borderGeo,
     };
     page.vb = contentVB(page);
     page.sites = buildSiteMap(page);
     return page;
   };
-  const top = mk('A', 'Array', o => (o.y + (o.h || 0)) <= midY);
-  const bottom = mk('B', 'CF/Cell', o => o.y + (o.h || 0) > midY);
+  const top = mk('A', 'Array', o => (o.y + (o.h || 0)) <= midY, borderTop);
+  const bottom = mk('B', 'CF/Cell', o => (o.y + (o.h || 0)) > midY, borderBottom);
   return [top, bottom];
 }
 
@@ -94,4 +140,4 @@ if (require.main === module) {
     }
   }
 }
-module.exports = { splitPages, buildSiteMap, contentVB };
+module.exports = { splitPages, buildSiteMap, contentVB, splitBorderGeo, parseGeo };

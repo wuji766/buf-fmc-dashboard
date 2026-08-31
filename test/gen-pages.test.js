@@ -1,7 +1,7 @@
 // test/gen-pages.test.js
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { splitPages, buildSiteMap } = require('../scripts/gen-pages.js');
+const { splitPages, buildSiteMap, splitBorderGeo, parseGeo } = require('../scripts/gen-pages.js');
 
 const fakeElements = {
   W: 100, H: 200,
@@ -60,4 +60,45 @@ test('真实数据切分：4 页且每页 sites>0', () => {
   assert.equal(pages[3].name, 'L40-CF/Cell');
   // L20-Array 应为 sites 最多的页
   assert.ok(pages[0].sites.length >= pages[1].sites.length);
+});
+
+test('splitBorderGeo：跨 midY 垂直段被裁分为两段分属两页', () => {
+  const geo = 'M10 5L10 5'; // 非法短串（长度0的水平段）也应可解析
+  const midY = 100;
+  const g = 'M50 20L50 180'      // 垂直段跨越 midY → 裁分
+    + 'M50 30L90 30'             // 水平段 y<midY → 上页
+    + 'M20 150L80 150'           // 水平段 y>midY → 下页
+    + 'M70 120L70 160';          // 垂直段整体在下区 → 下页
+  const [top, bot] = splitBorderGeo(g, midY);
+  const tSegs = parseGeo(top), bSegs = parseGeo(bot);
+  // 上页：垂直段被裁到 [20,100] + 水平段（顺序无关比较）
+  assert.deepEqual(tSegs.map(s => s.join(',')).sort(), ['50,20,50,100', '50,30,90,30'].sort());
+  // 下页：垂直段 [100,180] + 下区水平段 + 整段在下的垂直段
+  assert.deepEqual(bSegs.map(s => s.join(',')).sort(), ['50,100,50,180', '20,150,80,150', '70,120,70,160'].sort());
+  // 恰在 midY 上的水平段归上页（与 fills pred 一致）
+  const [t2, b2] = splitBorderGeo('M0 100L10 100', midY);
+  assert.equal(parseGeo(t2).length, 1);
+  assert.equal(parseGeo(b2).length, 0);
+  // 整段在 midY 以上的垂直段归上页
+  const [t3] = splitBorderGeo('M3 40L3 99', midY);
+  assert.equal(parseGeo(t3).length, 1);
+});
+
+test('真实数据切分：每页 borderGeo 非空且线段不跨页越界', () => {
+  const fs = require('fs'), path = require('path');
+  for (const file of ['elements-L20.json', 'elements-L40.json']) {
+    const el = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', file), 'utf8'));
+    const frame = file.includes('L20') ? 'L20' : 'L40';
+    const pages = splitPages(el, frame);
+    for (const p of pages) {
+      assert.ok(p.borderGeo && p.borderGeo.length > 10, p.name + ' borderGeo empty');
+      // midY = 两横幅分界；上页线段不得伸入 midY 以下、下页不得伸到 midY 之上
+      const midY = el.shapes.filter(s => (s.text || '') === 'Array' || (s.text || '') === 'CF/Cell').sort((a, b) => a.top - b.top)[1].top;
+      for (const [x0, y0, x1, y1] of parseGeo(p.borderGeo)) {
+        const ya = Math.min(y0, y1), yb = Math.max(y0, y1);
+        if (p.name.endsWith('Array')) assert.ok(yb <= midY + 0.01, p.name + ' segment crosses midY');
+        else assert.ok(ya >= midY - 0.01, p.name + ' segment crosses midY');
+      }
+    }
+  }
 });
