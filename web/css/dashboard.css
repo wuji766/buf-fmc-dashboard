@@ -42,6 +42,31 @@ body {
   font-size: 18px;
 }
 #alarmBar.hidden { display: none; }
+#alarmBar { border-top: 1px solid #5a1414; }
+#alarmBar .alarm-track {
+  display: inline-flex;
+  white-space: nowrap;
+  min-width: 100%;
+}
+#alarmBar .alarm-run {
+  display: inline-block;
+  white-space: nowrap;
+  animation: alarm-marquee linear infinite;
+}
+@keyframes alarm-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-100%); }
+}
+#alarmBar .alarm-sep { color: #a33; }
+
+/* 站点报警红描边脉冲（Task 5） */
+.alarm-pulse {
+  animation: alarm-stroke 2s ease-in-out infinite;
+}
+@keyframes alarm-stroke {
+  0%, 100% { stroke: #ff2020; stroke-width: 2; }
+  50%      { stroke: #ff7070; stroke-width: 6; }
+}
 
 /* 右下角页码指示器 */
 #pager {

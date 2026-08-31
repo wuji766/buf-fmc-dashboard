@@ -44,7 +44,10 @@
   });
   carousel.onTurn(function (i) {
     if (i === BUF.render.cur()) return;
-    BUF.render.show(i);
+    stopCruise();
+    focused = false;
+    BUF.render.show(i);   // 重置整页 viewBox
+    BUF.alarm.reset(i);   // 保险：viewBox 回整页，等下一 snapshot 重新聚焦
     syncPager();
   });
   buildPager(function (i) { carousel.manual(i); });
@@ -53,6 +56,14 @@
   /* 装配：数据引擎（mock provider） */
   var idToIdx = {};
   for (var pi = 0; pi < BUF.render.pageCount(); pi++) idToIdx[BUF.render.page(pi).id] = pi;
+
+  /* 报警相机状态：cruise 定时器 / 聚焦标记（避免每 2s snapshot 重复动画） */
+  var cruiseTimer = null, cruiseIdx = 0, cruiseSig = '', focused = false;
+  var lastAlarmRects = []; // 最近一次 snapshot 的当前页报警矩形（cruise 定时器用）
+  function stopCruise() {
+    if (cruiseTimer != null) { clearInterval(cruiseTimer); cruiseTimer = null; }
+    cruiseIdx = 0; cruiseSig = '';
+  }
 
   var provider = BUF.mock.createMockProvider({ pages: window.BUF_PAGES });
   provider.start(function (snap) {
@@ -72,9 +83,56 @@
       BUF.render.applyLots(i, byPageLots[i] || []);
     }
     var active = (snap.alarms || []).filter(function (a) { return a.active; })
-      .map(function (a) { return { pageId: idToIdx[a.pageId], ts: a.ts }; })
-      .filter(function (a) { return a.pageId != null; });
-    carousel.activeAlarms(active);
+      .filter(function (a) { return idToIdx[a.pageId] != null; });
+
+    /* 报警信息条：全局 active 列表（时间倒序 marquee） */
+    BUF.alarm.bar(active.map(function (a) {
+      return {
+        ts: a.ts, pageName: BUF.render.page(idToIdx[a.pageId]).name,
+        siteId: a.siteId, code: a.code, text: a.text
+      };
+    }));
+
+    /* 相机：当前显示页的报警站点 → 聚焦 / 巡航 / 复位 */
+    var cur = BUF.render.cur();
+    var curPage = BUF.render.page(cur);
+    var rectBySite = {};
+    (curPage && curPage.sites || []).forEach(function (s) { rectBySite[s.siteId] = s; });
+    var alarmRects = (byPageStations[cur] || []).filter(function (st) {
+      return st.status === 'alarm' && rectBySite[st.siteId] && rectBySite[st.siteId].rect;
+    }).map(function (st) { return rectBySite[st.siteId].rect; });
+
+    lastAlarmRects = alarmRects;
+    if (alarmRects.length) {
+      var cam = BUF.alarm.computeCamera(curPage, alarmRects, {});
+      if (cam.mode === 'envelope') {
+        stopCruise();
+        if (!focused) { BUF.alarm.focus(cur, cam.viewBox); focused = true; }
+      } else {
+        var sig = alarmRects.map(function (r) { return r.x + ',' + r.y; }).join(';');
+        if (sig !== cruiseSig) { stopCruise(); cruiseSig = sig; }
+        if (!focused) { BUF.alarm.focus(cur, cam.cruiseTargets[cruiseIdx % cam.cruiseTargets.length]); focused = true; }
+        if (cruiseTimer == null) {
+          cruiseTimer = setInterval(function () {
+            var i = BUF.render.cur();
+            var pg = BUF.render.page(i);
+            if (!pg || !lastAlarmRects.length) return;
+            var cs = BUF.alarm.computeCamera(pg, lastAlarmRects, {});
+            var tg = cs.mode === 'cruise' ? cs.cruiseTargets : [cs.viewBox];
+            if (!tg.length) return;
+            cruiseIdx = (cruiseIdx + 1) % tg.length;
+            BUF.alarm.focus(i, tg[cruiseIdx]);
+          }, 20000);
+        }
+      }
+    } else {
+      stopCruise();
+      if (focused) { BUF.alarm.reset(cur); focused = false; }
+    }
+
+    carousel.activeAlarms(active.map(function (a) {
+      return { pageId: idToIdx[a.pageId], ts: a.ts };
+    }));
   }, DATA_INTERVAL);
 
   /* 心跳：时钟 + 轮播 tick（切页由 onTurn 统一处理） */
