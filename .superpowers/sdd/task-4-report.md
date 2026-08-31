@@ -32,3 +32,10 @@
 ## 备注/疑虑
 - brief 的报警测试断言 `pageId === 'P1'`（页 id 字符串），而补充决定描述 pageId 为数字页索引；实现以 brief 测试为准（字符串 id），main.js 装配处做 id→索引映射喂 carousel，两端自洽。
 - brief 第三条测试 `moved` 变量断言为恒真（`|| true`），按原文照用，实际由 lot 数量恒为 4 断言兜底。
+
+## 修复（审查反馈）
+
+- mock-provider：lots 快照补 `sinceTs`（初始生成与迁移到站时记录），data-provider.js 契约注释同步。
+- test#3 改为真实迁移断言：注入固定种子随机源（opts.rand，LCG seed=42）+ tickTime(8000) 越过 nextMove 上限，断言 4 个 lot 归属 notDeepEqual 且 sinceTs 均为数字。
+- 顺手修：applyLots 徽标 y 钳制 Math.max(1, r.y-11) 防页顶越界。
+- 验证：node --test 全量 11 pass / 0 fail。

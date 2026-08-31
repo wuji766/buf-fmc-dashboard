@@ -187,7 +187,7 @@
       var shown = ls.slice(0, 3);
       var extra = ls.length - 3;
       var r = s.rect;
-      var by = r.y - 11; // 徽标行位于站点条上方
+      var by = Math.max(1, r.y - 11); // 徽标行位于站点条上方（页顶越界钳制）
       var bx = r.x + r.w;
       // 从右往左画，最多 3 个 + "+n"
       for (var k = shown.length - 1; k >= 0; k--) {

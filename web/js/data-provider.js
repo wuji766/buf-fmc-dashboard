@@ -8,7 +8,7 @@
  * 快照数据形状（与 mock-provider.js 的 snapshot() 一致）：
  *   {
  *     stations: [ { siteId, pageId, status, capacity: { used, total, pct } } ],
- *     lots:     [ { id, stationId, pageId } ],
+ *     lots:     [ { id, stationId, pageId, sinceTs } ],
  *     alarms:   [ { id, siteId, pageId, code, text, ts, active } ]
  *   }
  *   - pageId 为页 id 字符串，与 window.BUF_PAGES[i].id 对齐

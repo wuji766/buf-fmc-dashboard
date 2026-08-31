@@ -7,7 +7,8 @@
   var STATUSES = ['normal', 'preFull', 'full'];
   var PER_TICK_ALARM_RATE = 0.0033; // 2s 一 tick → 每页每分钟约 10%
 
-  function rnd(a, b) { return a + Math.random() * (b - a); }
+  var rand = Math.random; // 可注入随机源（createMockProvider 内按 opts.rand 重设）
+  function rnd(a, b) { return a + rand() * (b - a); }
   function ri(a, b) { return Math.floor(rnd(a, b + 1)); }
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 
@@ -20,6 +21,7 @@
     var alarmDurMs = opts.alarmDurationMs; // 缺省 1-5 分钟
     var nowFn = opts.now || function () { return Date.now(); };
 
+    var rand = opts.rand || Math.random; // 可注入随机源（测试确定性用）
     var tOffset = 0; // 虚拟时间偏移（tickTime 推进）
     function now() { return nowFn() + tOffset; }
 
@@ -48,7 +50,7 @@
     var lotSeq = 0;
     for (var i = 0; i < lotsCount && allSites.length; i++) {
       var s0 = allSites[ri(0, allSites.length - 1)];
-      lots.push({ id: 'L' + (++lotSeq), stationId: s0.siteId, pageId: s0.pageId, nextMove: now() + ri(2000, 8000) });
+      lots.push({ id: 'L' + (++lotSeq), stationId: s0.siteId, pageId: s0.pageId, sinceTs: now(), nextMove: now() + ri(2000, 8000) });
     }
 
     /* ---- 报警 ---- */
@@ -62,6 +64,7 @@
           var s = allSites[ri(0, allSites.length - 1)];
           l.stationId = s.siteId;
           l.pageId = s.pageId;
+          l.sinceTs = t; // 到站时间戳
           l.nextMove = t + ri(2000, 8000);
         }
       });
@@ -76,7 +79,7 @@
       if (alarmRate <= 0) return;
       var t = now();
       pages.forEach(function (p) {
-        if (Math.random() >= alarmRate) return;
+        if (rand() >= alarmRate) return;
         var sites = p.sites || [];
         if (!sites.length) return;
         var s = sites[ri(0, sites.length - 1)];
@@ -93,12 +96,12 @@
 
     function driftStations() {
       stations.forEach(function (st) {
-        if (Math.random() < 0.05) {
+        if (rand() < 0.05) {
           var idx = STATUSES.indexOf(st.status);
-          var next = clamp(idx + (Math.random() < 0.5 ? -1 : 1), 0, 2);
+          var next = clamp(idx + (rand() < 0.5 ? -1 : 1), 0, 2);
           st.status = STATUSES[next];
         }
-        if (Math.random() < 0.1) {
+        if (rand() < 0.1) {
           st.capacity.used = clamp(st.capacity.used + ri(-3, 5), 0, st.capacity.total);
           st.capacity.pct = Math.round(st.capacity.used / st.capacity.total * 100);
         }
@@ -130,7 +133,7 @@
             capacity: { used: st.capacity.used, total: st.capacity.total, pct: st.capacity.pct }
           };
         }),
-        lots: lots.map(function (l) { return { id: l.id, stationId: l.stationId, pageId: l.pageId }; }),
+        lots: lots.map(function (l) { return { id: l.id, stationId: l.stationId, pageId: l.pageId, sinceTs: l.sinceTs }; }),
         alarms: alarms.map(function (a) {
           return { id: a.id, siteId: a.siteId, pageId: a.pageId, code: a.code, text: a.text, ts: a.ts, active: a.active };
         })

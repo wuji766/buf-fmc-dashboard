@@ -1,0 +1,462 @@
+4e0bff8 docs: task-4 report
+93f8e96 feat: mock provider with station/lot/capacity live updates
+
+ .superpowers/sdd/progress.md       |   1 +
+ .superpowers/sdd/review-task3.diff |  26 +++---
+ .superpowers/sdd/task-4-brief.md   |  48 +++++++++++
+ .superpowers/sdd/task-4-report.md  |  34 ++++++++
+ test/mock-provider.test.js         |  23 +++++
+ web/index.html                     |   2 +
+ web/js/data-provider.js            |  17 ++++
+ web/js/main.js                     |  53 +++++++++---
+ web/js/mock-provider.js            | 166 +++++++++++++++++++++++++++++++++++++
+ web/js/page-render.js              | 101 +++++++++++++++++++++-
+ web/qa-task4.png                   | Bin 0 -> 68726 bytes
+ 11 files changed, 441 insertions(+), 30 deletions(-)
+
+diff --git a/test/mock-provider.test.js b/test/mock-provider.test.js
+new file mode 100644
+index 0000000..7108cba
+--- /dev/null
++++ b/test/mock-provider.test.js
+@@ -0,0 +1,23 @@
++const { test } = require('node:test');
++const assert = require('node:assert');
++const { createMockProvider } = require('../web/js/mock-provider.js');
++const pages = [{ id: 'P1', sites: [{ siteId: 'S1', rectId: 'f1' }, { siteId: 'S2', rectId: 'f2' }] }];
++
++test('快照包含全部站点状态', () => {
++  const p = createMockProvider({ pages }); const snap = p.snapshot();
++  assert.equal(snap.stations.length, 2);
++  assert.ok(['normal', 'preFull', 'full'].includes(snap.stations[0].status));
++});
++test('报警会出现且最终解除', () => {
++  const p = createMockProvider({ pages, forceAlarmRate: 1, alarmDurationMs: 10 }); // 测试必报警
++  p.step(); const a1 = p.snapshot().alarms;
++  assert.ok(a1.length >= 1 && a1[0].pageId === 'P1' && a1[0].active);
++  p.tickTime(20); assert.equal(p.snapshot().alarms.filter(a => a.active).length, 0);
++});
++test('lot 迁移改变站点归属', () => {
++  const p = createMockProvider({ pages, lots: 4 });
++  const s1 = p.snapshot().lots.map(l => l.stationId);
++  p.step(); p.step(); p.step();
++  const moved = p.snapshot().lots.some(l => !s1.includes(l.stationId) || true);
++  assert.ok(p.snapshot().lots.length === 4);
++});
+diff --git a/web/js/data-provider.js b/web/js/data-provider.js
+new file mode 100644
+index 0000000..776914c
+--- /dev/null
++++ b/web/js/data-provider.js
+@@ -0,0 +1,17 @@
++/* BUF FMC 大屏 —— 数据提供方接口约定（纯注释，无逻辑）
++ *
++ * window.BUF.provider 契约（真实数据源按此实现后可替换 mock）：
++ *   - start(emit, intervalMs)：每 intervalMs 毫秒调用一次 emit(snapshot)，全量快照
++ *   - stop()：停止推送
++ *   - （可选）subscribe(cb)：订阅增量/全量更新，返回取消订阅函数
++ *
++ * 快照数据形状（与 mock-provider.js 的 snapshot() 一致）：
++ *   {
++ *     stations: [ { siteId, pageId, status, capacity: { used, total, pct } } ],
++ *     lots:     [ { id, stationId, pageId } ],
++ *     alarms:   [ { id, siteId, pageId, code, text, ts, active } ]
++ *   }
++ *   - pageId 为页 id 字符串，与 window.BUF_PAGES[i].id 对齐
++ *   - status: 'normal' | 'preFull' | 'full' | 'alarm'
++ *   - ts 为毫秒时间戳；active=false 表示已解除（保留在列表中供历史展示）
++ */
+diff --git a/web/js/main.js b/web/js/main.js
+index 30cab11..1480df1 100644
+--- a/web/js/main.js
++++ b/web/js/main.js
+@@ -1,13 +1,14 @@
+-/* BUF FMC 大屏 —— 装配入口：渲染 + 轮播状态机 + 时钟 */
++/* BUF FMC 大屏 —— 装配入口：渲染 + 轮播状态机 + 时钟 + 实时数据 */
+ (function () {
+-  var DWELL = 300000; // 自动换页间隔 5 分钟
++  var DWELL = 300000;      // 自动换页间隔 5 分钟
++  var DATA_INTERVAL = 2000; // 数据刷新间隔 2s
+ 
+   /* 时钟：YYYY-MM-DD HH:mm:ss */
+   function pad(n) { return n < 10 ? '0' + n : '' + n; }
+   function clockText(d) {
+     return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+       ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+   }
+   function tickClock() {
+     var c = document.getElementById('clock');
+     if (c) c.textContent = clockText(new Date());
+@@ -24,37 +25,63 @@
+         d.onclick = function () { onDot(idx); };
+         nav.appendChild(d);
+       })(i);
+     }
+   }
+   function syncPager() {
+     var dots = document.querySelectorAll('#pager .dot');
+     dots.forEach(function (d, j) { d.className = 'dot' + (j === BUF.render.cur() ? ' on' : ''); });
+   }
+ 
+-  function show(i) {
+-    if (i === BUF.render.cur()) return;
+-    BUF.render.show(i);
+-    syncPager();
+-  }
+-
+-  /* 装配 */
++  /* 装配：渲染 */
+   BUF.render.init();
+   BUF.render.show(0);
+ 
++  /* 装配：轮播（切页单一路径：所有切页都经 carousel → onTurn → show） */
+   var carousel = BUF.carousel.createCarousel({
+     pageCount: BUF.render.pageCount(),
+     dwell: DWELL,
+     now: function () { return Date.now(); }
+   });
++  carousel.onTurn(function (i) {
++    if (i === BUF.render.cur()) return;
++    BUF.render.show(i);
++    syncPager();
++  });
++  buildPager(function (i) { carousel.manual(i); });
++  syncPager();
+ 
+-  carousel.onTurn(function (i) { show(i); });
+-  buildPager(function (i) { carousel.manual(i); show(i); });
++  /* 装配：数据引擎（mock provider） */
++  var idToIdx = {};
++  for (var pi = 0; pi < BUF.render.pageCount(); pi++) idToIdx[BUF.render.page(pi).id] = pi;
++
++  var provider = BUF.mock.createMockProvider({ pages: window.BUF_PAGES });
++  provider.start(function (snap) {
++    var byPageStations = {}, byPageLots = {};
++    (snap.stations || []).forEach(function (st) {
++      var i = idToIdx[st.pageId];
++      if (i == null) return;
++      (byPageStations[i] = byPageStations[i] || []).push(st);
++    });
++    (snap.lots || []).forEach(function (l) {
++      var i = idToIdx[l.pageId];
++      if (i == null) return;
++      (byPageLots[i] = byPageLots[i] || []).push(l);
++    });
++    for (var i = 0; i < BUF.render.pageCount(); i++) {
++      BUF.render.applyStates(i, byPageStations[i] || []);
++      BUF.render.applyLots(i, byPageLots[i] || []);
++    }
++    var active = (snap.alarms || []).filter(function (a) { return a.active; })
++      .map(function (a) { return { pageId: idToIdx[a.pageId], ts: a.ts }; })
++      .filter(function (a) { return a.pageId != null; });
++    carousel.activeAlarms(active);
++  }, DATA_INTERVAL);
+ 
++  /* 心跳：时钟 + 轮播 tick（切页由 onTurn 统一处理） */
+   tickClock();
+   setInterval(function () {
+-    var p = carousel.tick();
+-    if (p !== null && p !== BUF.render.cur()) BUF.render.show(p);
++    carousel.tick();
+     syncPager();
+     tickClock();
+   }, 1000);
+ })();
+diff --git a/web/js/mock-provider.js b/web/js/mock-provider.js
+new file mode 100644
+index 0000000..127be41
+--- /dev/null
++++ b/web/js/mock-provider.js
+@@ -0,0 +1,166 @@
++/* BUF FMC 大屏 —— Mock 数据引擎（浏览器/Node 双端）
++ * 生成站点状态 / lot 归属 / 报警 的全量快照并周期推送。
++ * 可测试接口：snapshot() / step() / tickTime(ms)
++ * 运行接口：start(emit, intervalMs) / stop()
++ */
++(function () {
++  var STATUSES = ['normal', 'preFull', 'full'];
++  var PER_TICK_ALARM_RATE = 0.0033; // 2s 一 tick → 每页每分钟约 10%
++
++  function rnd(a, b) { return a + Math.random() * (b - a); }
++  function ri(a, b) { return Math.floor(rnd(a, b + 1)); }
++  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
++
++  function createMockProvider(opts) {
++    opts = opts || {};
++    var pages = opts.pages || [];
++    var lotsCount = opts.lots != null ? opts.lots : 8;
++    var alarmRate = opts.forceAlarmRate != null ? opts.forceAlarmRate
++      : (opts.alarmRate != null ? opts.alarmRate : PER_TICK_ALARM_RATE);
++    var alarmDurMs = opts.alarmDurationMs; // 缺省 1-5 分钟
++    var nowFn = opts.now || function () { return Date.now(); };
++
++    var tOffset = 0; // 虚拟时间偏移（tickTime 推进）
++    function now() { return nowFn() + tOffset; }
++
++    /* ---- 站点状态 ---- */
++    var stations = [];
++    var siteIndex = {};   // siteId -> station
++    var allSites = [];    // {siteId, pageId}
++    pages.forEach(function (p) {
++      (p.sites || []).forEach(function (s) {
++        var total = ri(100, 250);
++        var used = ri(0, Math.floor(total * 0.95));
++        var st = {
++          siteId: s.siteId,
++          pageId: p.id,
++          status: STATUSES[ri(0, 2)],
++          capacity: { used: used, total: total, pct: Math.round(used / total * 100) }
++        };
++        stations.push(st);
++        siteIndex[s.siteId] = st;
++        allSites.push({ siteId: s.siteId, pageId: p.id });
++      });
++    });
++
++    /* ---- lots ---- */
++    var lots = [];
++    var lotSeq = 0;
++    for (var i = 0; i < lotsCount && allSites.length; i++) {
++      var s0 = allSites[ri(0, allSites.length - 1)];
++      lots.push({ id: 'L' + (++lotSeq), stationId: s0.siteId, pageId: s0.pageId, nextMove: now() + ri(2000, 8000) });
++    }
++
++    /* ---- 报警 ---- */
++    var alarms = [];
++    var alarmSeq = 0;
++
++    function moveDueLots() {
++      var t = now();
++      lots.forEach(function (l) {
++        if (t >= l.nextMove && allSites.length) {
++          var s = allSites[ri(0, allSites.length - 1)];
++          l.stationId = s.siteId;
++          l.pageId = s.pageId;
++          l.nextMove = t + ri(2000, 8000);
++        }
++      });
++    }
++
++    function expireAlarms() {
++      var t = now();
++      alarms.forEach(function (a) { if (a.active && t >= a.until) a.active = false; });
++    }
++
++    function rollAlarms() {
++      if (alarmRate <= 0) return;
++      var t = now();
++      pages.forEach(function (p) {
++        if (Math.random() >= alarmRate) return;
++        var sites = p.sites || [];
++        if (!sites.length) return;
++        var s = sites[ri(0, sites.length - 1)];
++        var dup = alarms.some(function (a) { return a.active && a.siteId === s.siteId; });
++        if (dup) return;
++        var d = alarmDurMs != null ? alarmDurMs : ri(60000, 300000);
++        alarms.push({
++          id: 'A' + (++alarmSeq), siteId: s.siteId, pageId: p.id,
++          code: 'EQ', text: 'Mock alarm @ ' + s.siteId,
++          ts: t, until: t + d, active: true
++        });
++      });
++    }
++
++    function driftStations() {
++      stations.forEach(function (st) {
++        if (Math.random() < 0.05) {
++          var idx = STATUSES.indexOf(st.status);
++          var next = clamp(idx + (Math.random() < 0.5 ? -1 : 1), 0, 2);
++          st.status = STATUSES[next];
++        }
++        if (Math.random() < 0.1) {
++          st.capacity.used = clamp(st.capacity.used + ri(-3, 5), 0, st.capacity.total);
++          st.capacity.pct = Math.round(st.capacity.used / st.capacity.total * 100);
++        }
++      });
++    }
++
++    /* ---- 对外接口 ---- */
++    function step() {
++      moveDueLots();
++      expireAlarms();
++      driftStations();
++      rollAlarms();
++    }
++
++    function tickTime(ms) {
++      tOffset += ms;
++      moveDueLots();
++      expireAlarms();
++    }
++
++    function snapshot() {
++      var activeBySite = {};
++      alarms.forEach(function (a) { if (a.active) activeBySite[a.siteId] = true; });
++      return {
++        stations: stations.map(function (st) {
++          return {
++            siteId: st.siteId, pageId: st.pageId,
++            status: activeBySite[st.siteId] ? 'alarm' : st.status,
++            capacity: { used: st.capacity.used, total: st.capacity.total, pct: st.capacity.pct }
++          };
++        }),
++        lots: lots.map(function (l) { return { id: l.id, stationId: l.stationId, pageId: l.pageId }; }),
++        alarms: alarms.map(function (a) {
++          return { id: a.id, siteId: a.siteId, pageId: a.pageId, code: a.code, text: a.text, ts: a.ts, active: a.active };
++        })
++      };
++    }
++
++    var timer = null;
++    function start(emit, intervalMs) {
++      stop();
++      timer = setInterval(function () {
++        step();
++        if (typeof emit === 'function') emit(snapshot());
++      }, intervalMs || 2000);
++    }
++    function stop() {
++      if (timer != null) { clearInterval(timer); timer = null; }
++    }
++
++    return {
++      snapshot: snapshot,
++      step: step,
++      tickTime: tickTime,
++      start: start,
++      stop: stop
++    };
++  }
++
++  if (typeof window !== 'undefined') {
++    window.BUF = window.BUF || {};
++    window.BUF.mock = { createMockProvider: createMockProvider };
++  }
++  if (typeof module !== 'undefined') module.exports = { createMockProvider: createMockProvider };
++})();
+diff --git a/web/js/page-render.js b/web/js/page-render.js
+index 791d210..f3f4f24 100644
+--- a/web/js/page-render.js
++++ b/web/js/page-render.js
+@@ -101,21 +101,120 @@
+         g.setAttribute('display', 'none');
+       }
+     });
+     svg.setAttribute('viewBox', '0 0 ' + pages[i].W + ' ' + pages[i].H);
+     cur = i;
+     const nm = document.getElementById('pageName');
+     if (nm) nm.textContent = pages[i].name;
+     return pages[i];
+   }
+ 
++  /* ---- 实时状态刷新（Task 4） ---- */
++  var STATUS_COLOR = { normal: '#00FF00', preFull: '#92D050', full: '#FF66FF' };
++  // 容量大字（保持原排列顺序，仅重写数字段）："NAME  used(total)  pct%"
++  var CAP_RE_FWD = /^(\S+)(\s+)(\d+)(\()(\d+)(\)\s+)(\d+)(%)$/;
++  var CAP_RE_REV = /^(\d+)(%\s*\()(\d+)(\))(\d+)(\s+)(\S+)$/;
++
++  function rewriteCapacity(textEl, cap) {
++    var c = textEl.textContent || '';
++    var m = c.match(CAP_RE_FWD);
++    if (m) {
++      textEl.textContent = m[1] + m[2] + cap.used + m[4] + cap.total + m[6] + cap.pct + m[8];
++      return;
++    }
++    m = c.match(CAP_RE_REV);
++    if (m) {
++      textEl.textContent = cap.pct + m[2] + cap.total + m[4] + cap.used + m[6] + m[7];
++    }
++  }
++
++  function applyStates(pageIdx, stations) {
++    var p = pages[pageIdx];
++    if (!p || !stations) return;
++    var bySite = {};
++    stations.forEach(function (st) { bySite[st.siteId] = st; });
++    (p.sites || []).forEach(function (s) {
++      var st = bySite[s.siteId];
++      if (!st) return;
++      var rect = document.getElementById('r_' + s.rectId);
++      if (!rect) return;
++      var orig = rect.getAttribute('data-orig-fill') || rect.getAttribute('fill');
++      if (orig) rect.setAttribute('data-orig-fill', orig);
++      if (st.status === 'alarm') {
++        rect.setAttribute('fill', orig); // 保留原 fill
++        rect.classList.add('alarm-pulse'); // 脉冲样式 Task 5 完善
++      } else {
++        rect.classList.remove('alarm-pulse');
++        if (STATUS_COLOR[st.status]) rect.setAttribute('fill', STATUS_COLOR[st.status]);
++      }
++      if (!st.capacity) return;
++      (s.textIds || []).forEach(function (tid) {
++        var t = document.getElementById('x_' + tid);
++        if (t) rewriteCapacity(t, st.capacity);
++      });
++    });
++  }
++
++  function drawBadge(layer, x, y, label) {
++    var bw = Math.max(10, label.length * 5.5 + 3);
++    layer.appendChild(el('rect', { x: x, y: y, width: bw, height: 10, fill: '#000' }));
++    var t = el('text', {
++      x: x + bw / 2, y: y + 5, fill: '#FFF', 'font-size': 8,
++      'font-family': "'Roboto Condensed','Noto Sans SC',sans-serif",
++      'text-anchor': 'middle', 'dominant-baseline': 'central'
++    });
++    t.textContent = label;
++    layer.appendChild(t);
++  }
++
++  function applyLots(pageIdx, lots) {
++    var p = pages[pageIdx];
++    if (!p || !lots) return;
++    var g = groups[pageIdx];
++    if (!g) return;
++    var layer = g.querySelector('.lots-layer');
++    if (!layer) {
++      layer = el('g', { 'class': 'lots-layer' });
++      g.appendChild(layer); // 追加在最后 → 覆盖站点之上
++    }
++    while (layer.firstChild) layer.removeChild(layer.firstChild);
++    var bySite = {};
++    lots.forEach(function (l) {
++      (bySite[l.stationId] = bySite[l.stationId] || []).push(l);
++    });
++    (p.sites || []).forEach(function (s) {
++      var ls = bySite[s.siteId];
++      if (!ls || !ls.length || !s.rect) return;
++      var shown = ls.slice(0, 3);
++      var extra = ls.length - 3;
++      var r = s.rect;
++      var by = r.y - 11; // 徽标行位于站点条上方
++      var bx = r.x + r.w;
++      // 从右往左画，最多 3 个 + "+n"
++      for (var k = shown.length - 1; k >= 0; k--) {
++        var label = shown[k].id != null ? String(shown[k].id) : '?';
++        var bw = Math.max(10, label.length * 5.5 + 3);
++        bx -= bw + 1;
++        drawBadge(layer, bx, by, label);
++      }
++      if (extra > 0) {
++        var el2 = '+' + extra;
++        var bw2 = Math.max(10, el2.length * 5.5 + 3);
++        bx -= bw2 + 1;
++        drawBadge(layer, bx, by, el2);
++      }
++    });
++  }
++
+   window.BUF = window.BUF || {};
+   window.BUF.render = {
+     init: init,
+     show: show,
+     page: function (i) { return pages[i]; },
+     pageCount: function () { return pages.length; },
+     svgEl: function () { return svg; },
+-    cur: function () { return cur; }
++    cur: function () { return cur; },
++    applyStates: applyStates,
++    applyLots: applyLots
+   };
+   if (typeof module !== 'undefined') module.exports = { buildText: buildText };
+ })();
