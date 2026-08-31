@@ -8,3 +8,4 @@ Task 4: complete (93f8e96+baa3d70+4186130, review clean after 3 rounds; Minor: �
 Task 5: complete (63c42b0+316a06b, review clean; Minor: bar未转义HTML/cruise分支lastEnvVB未清空/siteId带容量文本上游问题)
 Task 6: complete (209e684, review clean; Minor: URL解码容错/20000魔法数/截图入库)
 Final review: mergeable, fixes d3fa5be (cruise reset/escapeHtml/cross-boundary fills/README test cmd). All tasks complete.
+Feedback round 1: complete (ff9fcb8) - crop viewBox/status bar/legend. Remaining: 16:9 屏横向留黑(内容竖长)/小标签偏小(可后续 slice 模式或竖屏方案)
