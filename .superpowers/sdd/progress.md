@@ -11,3 +11,4 @@ Final review: mergeable, fixes d3fa5be (cruise reset/escapeHtml/cross-boundary f
 Feedback round 1: complete (ff9fcb8) - crop viewBox/status bar/legend. Remaining: 16:9 屏横向留黑(内容竖长)/小标签偏小(可后续 slice 模式或竖屏方案)
 Feedback round 2: complete (6e7aa52 + 13f128d, tests 19/19) - dwell reset fix/zoom+pan/labeled nav/per-page borders/pencil-fidelity text. MQTT 接入取消，转为持续优化。残留: 低缩放下 0.75px 网格线偏淡、ALFT 小标签需放大看(设计如此)
 Feedback round 3: complete (e1a487b, tests 19/19, QA harness clean x4 pages) - 根因: 跨页元素ID重名导致状态刷错页; bottom基线系数修正; ?qa=1 程序化核验通道
+Feedback round 4: complete (28666e7 web/data + pen sync 857/857+822/822+Copy L20x2) - shrink-to-fit 全量文字适配, QA: overlap 7/37/4/60->0/2/1/0 overflow->0; 新参照截图 docs/ref/pencil-*-v2.png
