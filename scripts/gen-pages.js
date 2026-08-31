@@ -37,6 +37,30 @@ function buildSiteMap(page) {
   return [...map.values()];
 }
 
+/* 页面内容紧凑包围盒：fills + texts 旋转 AABB 并集 + padding，钳到画布内 */
+function contentVB(page, pad) {
+  pad = pad || 10;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  const add = (x, y, w, h) => {
+    x0 = Math.min(x0, x); y0 = Math.min(y0, y);
+    x1 = Math.max(x1, x + w); y1 = Math.max(y1, y + h);
+  };
+  for (const f of page.fills) add(f.x, f.y, f.w, f.h);
+  for (const t of page.texts) {
+    if (t.rot === 90) add(t.x, t.y - t.w, t.h, t.w);
+    else if (t.rot === 270) add(t.x - t.h, t.y, t.h, t.w);
+    else add(t.x, t.y, t.w, t.h);
+  }
+  if (x0 === Infinity) return [0, 0, page.W, page.H];
+  // padding 后钳到画布范围内
+  x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad);
+  x1 = Math.min(page.W, x1 + pad); y1 = Math.min(page.H, y1 + pad);
+  return [
+    Math.round(x0 * 100) / 100, Math.round(y0 * 100) / 100,
+    Math.round((x1 - x0) * 100) / 100, Math.round((y1 - y0) * 100) / 100
+  ];
+}
+
 function splitPages(el, frameName) {
   const banners = findBanners(el, frameName);
   const midY = banners[1].top; // 第二条横幅顶 = 上下分界
@@ -49,6 +73,7 @@ function splitPages(el, frameName) {
       texts: el.texts.filter(pred).map((t, i) => ({ ...t, id: 't' + suffix + '_' + i })),
       borderGeo: el.borderGeo || '',
     };
+    page.vb = contentVB(page);
     page.sites = buildSiteMap(page);
     return page;
   };
@@ -69,4 +94,4 @@ if (require.main === module) {
     }
   }
 }
-module.exports = { splitPages, buildSiteMap };
+module.exports = { splitPages, buildSiteMap, contentVB };

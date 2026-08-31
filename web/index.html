@@ -12,7 +12,18 @@
   <span id="clock"></span>
   <span id="srcState" class="ok">模拟数据</span>
 </header>
+<div id="statusBar">
+  <span id="lotSummary">在厂 Lot 0 · 正常 0 / 预告 0 / 满杯 0 / 报警 0 · 活跃报警 0</span>
+  <span id="carouselState">自动轮播</span>
+</div>
 <main id="stage"><svg id="board" preserveAspectRatio="xMidYMid meet"></svg></main>
+<footer id="legend">
+  <span class="lg"><i class="sw sw-normal"></i>正常</span>
+  <span class="lg"><i class="sw sw-pre"></i>满杯预告</span>
+  <span class="lg"><i class="sw sw-full"></i>满杯警告</span>
+  <span class="lg"><i class="sw sw-alarm"></i>报警</span>
+  <span class="lg"><i class="sw sw-lot">12</i>Lot 在站</span>
+</footer>
 <footer id="alarmBar" class="hidden"></footer>
 <nav id="pager"></nav>
 <script src="config.js"></script>

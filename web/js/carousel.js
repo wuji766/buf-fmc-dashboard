@@ -89,6 +89,12 @@
       manual: manual,
       activeAlarms: activeAlarms,
       currentPage: currentPage,
+      /* 状态查询（供页头状态条显示） */
+      mode: function () { return mode; },
+      pageStartTs: function () { return pageStartTs; },
+      manualUntil: function () { return manualUntil; },
+      alarmPageCount: function () { return alarmPages.length; },
+      alarmIdx: function () { return alarmPages.indexOf(page); },
       onTurn: function (cb) { if (typeof cb === 'function') listeners.push(cb); }
     };
   }

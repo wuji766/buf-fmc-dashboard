@@ -111,6 +111,18 @@
     var active = (snap.alarms || []).filter(function (a) { return a.active; })
       .filter(function (a) { return idToIdx[a.pageId] != null; });
 
+    /* 状态条摘要：lot 总数 + 站点状态分布 + 活跃报警数 */
+    var cnt = { lots: (snap.lots || []).length, normal: 0, preFull: 0, full: 0, alarm: 0, activeAlarms: active.length };
+    (snap.stations || []).forEach(function (st) {
+      if (st.status === 'normal') cnt.normal++;
+      else if (st.status === 'preFull') cnt.preFull++;
+      else if (st.status === 'full') cnt.full++;
+      else if (st.status === 'alarm') cnt.alarm++;
+    });
+    lastSummary = cnt;
+    renderSummary();
+    renderCarouselState();
+
     /* 报警信息条：全局 active 列表（时间倒序 marquee） */
     BUF.alarm.bar(active.map(function (a) {
       return {
@@ -167,11 +179,48 @@
     }));
   }, DATA_INTERVAL);
 
-  /* 心跳：时钟 + 轮播 tick（切页由 onTurn 统一处理） */
+  /* 心跳：时钟 + 轮播 tick（切页由 onTurn 统一处理）+ 状态条刷新 */
   tickClock();
+  var lastSummary = { lots: 0, normal: 0, preFull: 0, full: 0, alarm: 0, activeAlarms: 0 };
+  function esc(n) { return '<span class="num">' + n + '</span>'; }
+  function renderSummary() {
+    var s = lastSummary;
+    var el = document.getElementById('lotSummary');
+    if (!el) return;
+    el.innerHTML = '在厂 Lot ' + esc(s.lots) +
+      ' · 正常 ' + esc(s.normal) + ' / 预告 ' + esc(s.preFull) +
+      ' / 满杯 ' + esc(s.full) + ' / 报警 <span class="num alarm">' + s.alarm + '</span>' +
+      ' · 活跃报警 <span class="num alarm">' + s.activeAlarms + '</span>';
+  }
+  function mmss(ms) {
+    if (ms < 0) ms = 0;
+    var s = Math.round(ms / 1000);
+    return Math.floor(s / 60) + ':' + pad(s % 60);
+  }
+  function renderCarouselState() {
+    var el = document.getElementById('carouselState');
+    if (!el) return;
+    var t = Date.now();
+    if (t < carousel.manualUntil()) {
+      el.className = 'manual';
+      el.textContent = '手动浏览';
+    } else if (carousel.mode() === 'ALARM_SINGLE') {
+      el.className = 'alarm';
+      el.textContent = '报警锁定';
+    } else if (carousel.mode() === 'ALARM_MULTI') {
+      el.className = 'alarm';
+      var idx = carousel.alarmIdx();
+      el.textContent = '报警轮播 ' + (idx < 0 ? 1 : idx + 1) + '/' + carousel.alarmPageCount();
+    } else {
+      el.className = '';
+      el.textContent = '自动轮播 · 下一页 ' + mmss(DWELL - (t - carousel.pageStartTs()));
+    }
+  }
+  renderSummary();
   setInterval(function () {
     carousel.tick();
     syncPager();
     tickClock();
+    renderCarouselState();
   }, 1000);
 })();

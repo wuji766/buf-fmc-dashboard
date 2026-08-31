@@ -9,14 +9,21 @@
 
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 
-  /* 生成一个中心在 (cx,cy)、宽 vw 的等比（页面宽高比）viewBox，钳到页面内 */
+  /* 生成一个中心在 (cx,cy)、宽 vw 的等比（紧凑包围盒宽高比）viewBox，钳到包围盒内 */
   function boxAround(page, cx, cy, vw) {
-    var vh = vw * page.H / page.W;
-    var x = clamp(cx - vw / 2, 0, Math.max(0, page.W - vw));
-    var y = clamp(cy - vh / 2, 0, Math.max(0, page.H - vh));
+    var b = pageBasis(page);
+    var vh = vw * b.h / b.w;
+    var x = clamp(cx - vw / 2, b.x, Math.max(b.x, b.x + b.w - vw));
+    var y = clamp(cy - vh / 2, b.y, Math.max(b.y, b.y + b.h - vh));
     return [round(x), round(y), round(vw), round(vh)];
   }
   function round(v) { return Math.round(v * 100) / 100; }
+  /* 页面基准：优先紧凑包围盒 page.vb，缺省回退整页 [0,0,W,H] */
+  function pageBasis(page) {
+    var v = page && page.vb;
+    if (v && v.length === 4 && v[2] > 0 && v[3] > 0) return { x: v[0], y: v[1], w: v[2], h: v[3] };
+    return { x: 0, y: 0, w: page ? page.W : 0, h: page ? page.H : 0 };
+  }
 
   function computeCamera(page, alarmSites, opts) {
     opts = opts || {};
@@ -26,8 +33,10 @@
 
     var sites = (alarmSites || []).filter(function (s) { return s && s.w != null; });
     if (!sites.length || !page || !page.W) {
-      return { viewBox: [0, 0, page ? page.W : 0, page ? page.H : 0], mode: 'envelope', cruiseTargets: [] };
+      var fb = pageBasis(page);
+      return { viewBox: [fb.x, fb.y, fb.w, fb.h], mode: 'envelope', cruiseTargets: [] };
     }
+    var basis = pageBasis(page);
 
     /* 包络 */
     var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -41,17 +50,17 @@
     /* 等比 view 宽：保证装下 (包络宽+2pad, 包络高+2pad) */
     var needW = (x1 - x0) + 2 * pad;
     var needH = (y1 - y0) + 2 * pad;
-    var vw = Math.max(needW, needH * page.W / page.H);
+    var vw = Math.max(needW, needH * basis.w / basis.h);
 
-    var zoom = page.W / vw;
+    var zoom = basis.w / vw;
     if (zoom >= minZoom) {
       /* 包络特写：zoom 钳上限 */
-      var vw2 = page.W / Math.min(zoom, maxZoom);
+      var vw2 = basis.w / Math.min(zoom, maxZoom);
       return { viewBox: boxAround(page, cx, cy, vw2), mode: 'envelope', cruiseTargets: [] };
     }
 
     /* 包络过大 → 巡航：逐点特写（每点 maxZoom 倍） */
-    var vw3 = page.W / maxZoom;
+    var vw3 = basis.w / maxZoom;
     var targets = sites.map(function (s) {
       return boxAround(page, s.x + s.w / 2, s.y + s.h / 2, vw3);
     });
@@ -104,7 +113,8 @@
   function reset(pageIdx) {
     var page = window.BUF.render && window.BUF.render.page(pageIdx);
     if (!page) return;
-    animateViewBox([0, 0, page.W, page.H], 500);
+    var b = pageBasis(page); // 紧凑包围盒，缺省回退整页
+    animateViewBox([b.x, b.y, b.w, b.h], 500);
   }
 
   /* ---- 报警信息条（marquee：内容复制两份实现无缝循环） ---- */

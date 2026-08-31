@@ -37,6 +37,12 @@ test('splitPages 按横幅切分为上下两页', () => {
   // site 映射建立且关联 textIds
   const s1 = pages[0].sites.find(s => s.siteId === 'S1');
   assert.ok(s1 && s1.rectId && s1.textIds.length === 1);
+  // 每页带紧凑包围盒 vb，且明显小于整页
+  for (const p of pages) {
+    assert.ok(Array.isArray(p.vb) && p.vb.length === 4 && p.vb[2] > 0 && p.vb[3] > 0, p.name + ' vb missing');
+    assert.ok(p.vb[2] <= p.W && p.vb[3] <= p.H, p.name + ' vb exceeds canvas');
+    assert.ok(p.vb[2] * p.vb[3] < p.W * p.H, p.name + ' vb not compact');
+  }
 });
 
 test('真实数据切分：4 页且每页 sites>0', () => {

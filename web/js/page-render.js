@@ -101,7 +101,8 @@
         g.setAttribute('display', 'none');
       }
     });
-    svg.setAttribute('viewBox', '0 0 ' + pages[i].W + ' ' + pages[i].H);
+    var vb = pages[i].vb || [0, 0, pages[i].W, pages[i].H]; // 紧凑包围盒，缺省回退整页
+    svg.setAttribute('viewBox', vb[0] + ' ' + vb[1] + ' ' + vb[2] + ' ' + vb[3]);
     cur = i;
     const nm = document.getElementById('pageName');
     if (nm) nm.textContent = pages[i].name;
