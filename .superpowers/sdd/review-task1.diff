@@ -1,0 +1,177 @@
+01e48ca docs: task-1 report
+a39b8cd feat: page data generator splitting frames by production line
+
+ .superpowers/sdd/progress.md      |   2 +
+ .superpowers/sdd/task-1-brief.md  | 133 ++++++++++++++++++++++++++++++++++++++
+ .superpowers/sdd/task-1-report.md |  34 ++++++++++
+ scripts/gen-pages.js              |  72 +++++++++++++++++++++
+ scripts/task-brief.js             |  15 +++++
+ test/gen-pages.test.js            |  57 ++++++++++++++++
+ web/data/page-1.js                |   1 +
+ web/data/page-2.js                |   1 +
+ web/data/page-3.js                |   1 +
+ web/data/page-4.js                |   1 +
+ 10 files changed, 317 insertions(+)
+
+diff --git a/scripts/gen-pages.js b/scripts/gen-pages.js
+new file mode 100644
+index 0000000..a935199
+--- /dev/null
++++ b/scripts/gen-pages.js
+@@ -0,0 +1,72 @@
++// gen-pages.js — elements-{frame}.json -> web/data/page-{n}.js
++const fs = require('fs'), path = require('path');
++const DATA = path.join(__dirname, '..', 'data');
++const OUT = path.join(__dirname, '..', 'web', 'data');
++fs.mkdirSync(OUT, { recursive: true });
++
++function siteIdOf(name) { return typeof name === 'string' && name.startsWith('site:') ? name.slice(5).trim() : null; }
++
++// banner 识别：shape.name 以 "banner:" 开头（约定格式），或 shape.text 为 "Array"/"CF/Cell"
++// （实测 elements json 中横幅的 name 是 "正方形/長方形 1/2"，靠 text 识别）
++function findBanners(el, frameName) {
++  const banners = el.shapes.filter(s =>
++    /^banner:/i.test(s.name || '') || (s.text || '') === 'Array' || (s.text || '') === 'CF/Cell'
++  ).sort((a, b) => a.top - b.top);
++  if (banners.length < 2) throw new Error(frameName + ' expects 2 banners, got ' + banners.length);
++  return banners;
++}
++
++function buildSiteMap(page) {
++  const map = new Map(); // siteId -> {siteId, rectId, rect, textIds:[]}
++  for (const f of page.fills) {
++    const sid = siteIdOf(f.name);
++    if (!sid) continue;
++    map.set(sid, { siteId: sid, rectId: f.id, rect: { x: f.x, y: f.y, w: f.w, h: f.h }, textIds: [] });
++  }
++  // 文字中心点（按 rot 推导渲染 AABB，与 convert.js 实测公式一致）落在站点矩形内则关联
++  for (const t of page.texts) {
++    const aabb = t.rot === 90 ? { x: t.x, y: t.y - t.w, w: t.h, h: t.w }
++      : t.rot === 270 ? { x: t.x - t.h, y: t.y, w: t.h, h: t.w }
++      : { x: t.x, y: t.y, w: t.w, h: t.h };
++    const tcx = aabb.x + aabb.w / 2, tcy = aabb.y + aabb.h / 2;
++    for (const [, s] of map) {
++      const r = s.rect;
++      if (tcx >= r.x && tcx <= r.x + r.w && tcy >= r.y && tcy <= r.y + r.h) { s.textIds.push(t.id); break; }
++    }
++  }
++  return [...map.values()];
++}
++
++function splitPages(el, frameName) {
++  const banners = findBanners(el, frameName);
++  const midY = banners[1].top; // 第二条横幅顶 = 上下分界
++  const mk = (suffix, pageName, pred) => {
++    const fills = el.fills.filter(pred).map((f, i) => ({ ...f, id: 'f' + suffix + '_' + i }));
++    const page = {
++      id: frameName + '-' + suffix, name: frameName + '-' + pageName,
++      frame: frameName, W: el.W, H: el.H,
++      fills,
++      texts: el.texts.filter(pred).map((t, i) => ({ ...t, id: 't' + suffix + '_' + i })),
++      borderGeo: el.borderGeo || '',
++    };
++    page.sites = buildSiteMap(page);
++    return page;
++  };
++  const top = mk('A', 'Array', o => (o.y + (o.h || 0)) <= midY);
++  const bottom = mk('B', 'CF/Cell', o => o.y >= midY);
++  return [top, bottom];
++}
++
++if (require.main === module) {
++  let n = 1;
++  for (const [frame, file] of [['L20', 'elements-L20.json'], ['L40', 'elements-L40.json']]) {
++    const el = JSON.parse(fs.readFileSync(path.join(DATA, file), 'utf8'));
++    for (const p of splitPages(el, frame)) {
++      const js = 'window.BUF_PAGES=window.BUF_PAGES||[];BUF_PAGES.push(' + JSON.stringify(p) + ');';
++      fs.writeFileSync(path.join(OUT, 'page-' + n + '.js'), js);
++      console.log('page-' + n, p.name, 'fills=' + p.fills.length, 'texts=' + p.texts.length, 'sites=' + p.sites.length);
++      n++;
++    }
++  }
++}
++module.exports = { splitPages, buildSiteMap };
+diff --git a/scripts/task-brief.js b/scripts/task-brief.js
+new file mode 100644
+index 0000000..2cafb0a
+--- /dev/null
++++ b/scripts/task-brief.js
+@@ -0,0 +1,15 @@
++// task-brief.js — 从 plan 提取 Task N 全文到 .superpowers/sdd/task-N-brief.md
++const fs = require('fs'), path = require('path');
++const [planFile, n] = process.argv.slice(2);
++const txt = fs.readFileSync(planFile, 'utf8');
++const re = /^### Task (\d+):/gm;
++const marks = [...txt.matchAll(re)].map(m => ({ n: +m[1], i: m.index }));
++const t = marks.find(m => m.n === +n);
++if (!t) { console.error('task not found'); process.exit(1); }
++const next = marks.find(m => m.i > t.i);
++const body = txt.slice(t.i, next ? next.i : txt.length).replace(/^### Task \d+:.*\n/, '');
++const outDir = path.join(__dirname, '..', '.superpowers', 'sdd');
++fs.mkdirSync(outDir, { recursive: true });
++const out = path.join(outDir, `task-${n}-brief.md`);
++fs.writeFileSync(out, body);
++console.log(out);
+diff --git a/test/gen-pages.test.js b/test/gen-pages.test.js
+new file mode 100644
+index 0000000..526ccf7
+--- /dev/null
++++ b/test/gen-pages.test.js
+@@ -0,0 +1,57 @@
++// test/gen-pages.test.js
++const { test } = require('node:test');
++const assert = require('node:assert');
++const { splitPages, buildSiteMap } = require('../scripts/gen-pages.js');
++
++const fakeElements = {
++  W: 100, H: 200,
++  shapes: [
++    { name: 'banner:Array', text: 'Array', left: 0, top: 50, width: 100, height: 20 },
++    { name: 'banner:CF/Cell', text: 'CF/Cell', left: 0, top: 140, width: 100, height: 20 },
++  ],
++  fills: [
++    { x: 0, y: 0, w: 10, h: 10, color: '#00FF00', name: 'site:S1' },
++    { x: 0, y: 80, w: 10, h: 10, color: '#92D050', name: 'site:S2' },
++    { x: 0, y: 170, w: 10, h: 10, color: '#FF66FF', name: 'fill@r1c1' },
++  ],
++  texts: [
++    { content: 'S1', x: 0, y: 0, w: 10, h: 10, size: 10, bold: false, rot: 0, align: 'center', valign: 'middle', color: '#000000', font: 'Roboto Condensed' },
++    { content: 'S2', x: 0, y: 80, w: 10, h: 10, size: 10, bold: false, rot: 0, align: 'center', valign: 'middle', color: '#000000', font: 'Roboto Condensed' },
++  ],
++};
++
++test('splitPages 按横幅切分为上下两页', () => {
++  const pages = splitPages(fakeElements, 'L20');
++  assert.equal(pages.length, 2);
++  assert.equal(pages[0].name, 'L20-Array');
++  assert.equal(pages[1].name, 'L20-CF/Cell');
++  // S1 在 Array 页
++  assert.ok(pages[0].fills.some(f => f.name === 'site:S1'));
++  // S2 (y=80, 在两横幅之间) —— 分界线是 CF/Cell 横幅顶(140)，S2 属于 Array 页
++  // （若归下页，真实数据中 Array 页 sites 将为 0：fills 从 y=25.9 起，Array 横幅顶仅 25.7）
++  assert.ok(pages[0].fills.some(f => f.name === 'site:S2'));
++  const s2 = pages[0].sites.find(s => s.siteId === 'S2');
++  assert.ok(s2 && s2.rectId && s2.textIds.length === 1);
++  // 下页含 CF/Cell 横幅以下区域
++  assert.ok(pages[1].fills.some(f => f.name === 'fill@r1c1'));
++  // site 映射建立且关联 textIds
++  const s1 = pages[0].sites.find(s => s.siteId === 'S1');
++  assert.ok(s1 && s1.rectId && s1.textIds.length === 1);
++});
++
++test('真实数据切分：4 页且每页 sites>0', () => {
++  const fs = require('fs'), path = require('path');
++  const pages = [];
++  for (const file of ['elements-L20.json', 'elements-L40.json']) {
++    const el = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', file), 'utf8'));
++    pages.push(...splitPages(el, file.includes('L20') ? 'L20' : 'L40'));
++  }
++  assert.equal(pages.length, 4);
++  for (const p of pages) assert.ok(p.sites.length > 0, p.name + ' sites=0');
++  assert.equal(pages[0].name, 'L20-Array');
++  assert.equal(pages[1].name, 'L20-CF/Cell');
++  assert.equal(pages[2].name, 'L40-Array');
++  assert.equal(pages[3].name, 'L40-CF/Cell');
++  // L20-Array 应为 sites 最多的页
++  assert.ok(pages[0].sites.length >= pages[1].sites.length);
++});

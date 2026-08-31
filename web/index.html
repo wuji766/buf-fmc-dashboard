@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>BUF FMC 监控大屏</title>
+<link rel="stylesheet" href="css/dashboard.css">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<header id="hud">
+  <span id="pageName">—</span>
+  <span id="clock"></span>
+  <span id="srcState" class="ok">模拟数据</span>
+</header>
+<main id="stage"><svg id="board" preserveAspectRatio="xMidYMid meet"></svg></main>
+<footer id="alarmBar" class="hidden"></footer>
+<nav id="pager"></nav>
+<script src="data/page-1.js"></script><script src="data/page-2.js"></script>
+<script src="data/page-3.js"></script><script src="data/page-4.js"></script>
+<script src="js/page-render.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

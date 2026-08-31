@@ -1,0 +1,61 @@
+/* BUF FMC 监控大屏骨架样式 */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100vw; height: 100vh; overflow: hidden; }
+body {
+  background: #000;
+  color: #cfe8ff;
+  font-family: 'Roboto Condensed', 'Noto Sans SC', sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 页头 */
+#hud {
+  flex: 0 0 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  background: linear-gradient(180deg, #0a1526, #06101c);
+  border-bottom: 1px solid #14304f;
+  font-size: 20px;
+  letter-spacing: 1px;
+}
+#pageName { color: #7fd4ff; font-weight: 700; }
+#clock { color: #9fb8cc; font-variant-numeric: tabular-nums; }
+#srcState.ok { color: #3fe08a; }
+#srcState.err { color: #ff5f5f; }
+
+/* 主舞台 */
+#stage { flex: 1 1 auto; min-height: 0; display: flex; }
+#board { width: 100%; height: 100%; display: block; }
+#board .page { transition: opacity .6s ease; opacity: 1; }
+
+/* 报警条（Task 3 启用） */
+#alarmBar {
+  flex: 0 0 40px;
+  overflow: hidden;
+  white-space: nowrap;
+  background: #2a0b0b;
+  color: #ff8080;
+  line-height: 40px;
+  font-size: 18px;
+}
+#alarmBar.hidden { display: none; }
+
+/* 右下角页码指示器 */
+#pager {
+  position: fixed;
+  right: 18px;
+  bottom: 14px;
+  display: flex;
+  gap: 8px;
+}
+#pager .dot {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 1px solid #3f6f9f;
+  background: transparent;
+  cursor: pointer;
+}
+#pager .dot.on { background: #7fd4ff; border-color: #7fd4ff; }
