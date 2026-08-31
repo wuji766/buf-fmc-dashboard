@@ -108,6 +108,103 @@
     return pages[i];
   }
 
+  /* ---- 实时状态刷新（Task 4） ---- */
+  var STATUS_COLOR = { normal: '#00FF00', preFull: '#92D050', full: '#FF66FF' };
+  // 容量大字（保持原排列顺序，仅重写数字段）："NAME  used(total)  pct%"
+  var CAP_RE_FWD = /^(\S+)(\s+)(\d+)(\()(\d+)(\)\s+)(\d+)(%)$/;
+  var CAP_RE_REV = /^(\d+)(%\s*\()(\d+)(\))(\d+)(\s+)(\S+)$/;
+
+  function rewriteCapacity(textEl, cap) {
+    var c = textEl.textContent || '';
+    var m = c.match(CAP_RE_FWD);
+    if (m) {
+      textEl.textContent = m[1] + m[2] + cap.used + m[4] + cap.total + m[6] + cap.pct + m[8];
+      return;
+    }
+    m = c.match(CAP_RE_REV);
+    if (m) {
+      textEl.textContent = cap.pct + m[2] + cap.total + m[4] + cap.used + m[6] + m[7];
+    }
+  }
+
+  function applyStates(pageIdx, stations) {
+    var p = pages[pageIdx];
+    if (!p || !stations) return;
+    var bySite = {};
+    stations.forEach(function (st) { bySite[st.siteId] = st; });
+    (p.sites || []).forEach(function (s) {
+      var st = bySite[s.siteId];
+      if (!st) return;
+      var rect = document.getElementById('r_' + s.rectId);
+      if (!rect) return;
+      var orig = rect.getAttribute('data-orig-fill') || rect.getAttribute('fill');
+      if (orig) rect.setAttribute('data-orig-fill', orig);
+      if (st.status === 'alarm') {
+        rect.setAttribute('fill', orig); // 保留原 fill
+        rect.classList.add('alarm-pulse'); // 脉冲样式 Task 5 完善
+      } else {
+        rect.classList.remove('alarm-pulse');
+        if (STATUS_COLOR[st.status]) rect.setAttribute('fill', STATUS_COLOR[st.status]);
+      }
+      if (!st.capacity) return;
+      (s.textIds || []).forEach(function (tid) {
+        var t = document.getElementById('x_' + tid);
+        if (t) rewriteCapacity(t, st.capacity);
+      });
+    });
+  }
+
+  function drawBadge(layer, x, y, label) {
+    var bw = Math.max(10, label.length * 5.5 + 3);
+    layer.appendChild(el('rect', { x: x, y: y, width: bw, height: 10, fill: '#000' }));
+    var t = el('text', {
+      x: x + bw / 2, y: y + 5, fill: '#FFF', 'font-size': 8,
+      'font-family': "'Roboto Condensed','Noto Sans SC',sans-serif",
+      'text-anchor': 'middle', 'dominant-baseline': 'central'
+    });
+    t.textContent = label;
+    layer.appendChild(t);
+  }
+
+  function applyLots(pageIdx, lots) {
+    var p = pages[pageIdx];
+    if (!p || !lots) return;
+    var g = groups[pageIdx];
+    if (!g) return;
+    var layer = g.querySelector('.lots-layer');
+    if (!layer) {
+      layer = el('g', { 'class': 'lots-layer' });
+      g.appendChild(layer); // 追加在最后 → 覆盖站点之上
+    }
+    while (layer.firstChild) layer.removeChild(layer.firstChild);
+    var bySite = {};
+    lots.forEach(function (l) {
+      (bySite[l.stationId] = bySite[l.stationId] || []).push(l);
+    });
+    (p.sites || []).forEach(function (s) {
+      var ls = bySite[s.siteId];
+      if (!ls || !ls.length || !s.rect) return;
+      var shown = ls.slice(0, 3);
+      var extra = ls.length - 3;
+      var r = s.rect;
+      var by = r.y - 11; // 徽标行位于站点条上方
+      var bx = r.x + r.w;
+      // 从右往左画，最多 3 个 + "+n"
+      for (var k = shown.length - 1; k >= 0; k--) {
+        var label = shown[k].id != null ? String(shown[k].id) : '?';
+        var bw = Math.max(10, label.length * 5.5 + 3);
+        bx -= bw + 1;
+        drawBadge(layer, bx, by, label);
+      }
+      if (extra > 0) {
+        var el2 = '+' + extra;
+        var bw2 = Math.max(10, el2.length * 5.5 + 3);
+        bx -= bw2 + 1;
+        drawBadge(layer, bx, by, el2);
+      }
+    });
+  }
+
   window.BUF = window.BUF || {};
   window.BUF.render = {
     init: init,
@@ -115,7 +212,9 @@
     page: function (i) { return pages[i]; },
     pageCount: function () { return pages.length; },
     svgEl: function () { return svg; },
-    cur: function () { return cur; }
+    cur: function () { return cur; },
+    applyStates: applyStates,
+    applyLots: applyLots
   };
   if (typeof module !== 'undefined') module.exports = { buildText: buildText };
 })();

@@ -1,6 +1,7 @@
-/* BUF FMC 大屏 —— 装配入口：渲染 + 轮播状态机 + 时钟 */
+/* BUF FMC 大屏 —— 装配入口：渲染 + 轮播状态机 + 时钟 + 实时数据 */
 (function () {
-  var DWELL = 300000; // 自动换页间隔 5 分钟
+  var DWELL = 300000;      // 自动换页间隔 5 分钟
+  var DATA_INTERVAL = 2000; // 数据刷新间隔 2s
 
   /* 时钟：YYYY-MM-DD HH:mm:ss */
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
@@ -31,29 +32,55 @@
     dots.forEach(function (d, j) { d.className = 'dot' + (j === BUF.render.cur() ? ' on' : ''); });
   }
 
-  function show(i) {
-    if (i === BUF.render.cur()) return;
-    BUF.render.show(i);
-    syncPager();
-  }
-
-  /* 装配 */
+  /* 装配：渲染 */
   BUF.render.init();
   BUF.render.show(0);
 
+  /* 装配：轮播（切页单一路径：所有切页都经 carousel → onTurn → show） */
   var carousel = BUF.carousel.createCarousel({
     pageCount: BUF.render.pageCount(),
     dwell: DWELL,
     now: function () { return Date.now(); }
   });
+  carousel.onTurn(function (i) {
+    if (i === BUF.render.cur()) return;
+    BUF.render.show(i);
+    syncPager();
+  });
+  buildPager(function (i) { carousel.manual(i); });
+  syncPager();
 
-  carousel.onTurn(function (i) { show(i); });
-  buildPager(function (i) { carousel.manual(i); show(i); });
+  /* 装配：数据引擎（mock provider） */
+  var idToIdx = {};
+  for (var pi = 0; pi < BUF.render.pageCount(); pi++) idToIdx[BUF.render.page(pi).id] = pi;
 
+  var provider = BUF.mock.createMockProvider({ pages: window.BUF_PAGES });
+  provider.start(function (snap) {
+    var byPageStations = {}, byPageLots = {};
+    (snap.stations || []).forEach(function (st) {
+      var i = idToIdx[st.pageId];
+      if (i == null) return;
+      (byPageStations[i] = byPageStations[i] || []).push(st);
+    });
+    (snap.lots || []).forEach(function (l) {
+      var i = idToIdx[l.pageId];
+      if (i == null) return;
+      (byPageLots[i] = byPageLots[i] || []).push(l);
+    });
+    for (var i = 0; i < BUF.render.pageCount(); i++) {
+      BUF.render.applyStates(i, byPageStations[i] || []);
+      BUF.render.applyLots(i, byPageLots[i] || []);
+    }
+    var active = (snap.alarms || []).filter(function (a) { return a.active; })
+      .map(function (a) { return { pageId: idToIdx[a.pageId], ts: a.ts }; })
+      .filter(function (a) { return a.pageId != null; });
+    carousel.activeAlarms(active);
+  }, DATA_INTERVAL);
+
+  /* 心跳：时钟 + 轮播 tick（切页由 onTurn 统一处理） */
   tickClock();
   setInterval(function () {
-    var p = carousel.tick();
-    if (p !== null && p !== BUF.render.cur()) BUF.render.show(p);
+    carousel.tick();
     syncPager();
     tickClock();
   }, 1000);

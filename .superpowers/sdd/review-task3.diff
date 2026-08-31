@@ -1,23 +1,12 @@
+0ade782 fix: default dwell 300000 in carousel
 4f19748 feat: carousel state machine with alarm lock/rotation
-
- .superpowers/sdd/progress.md       |   1 +
- .superpowers/sdd/review-task2.diff | 276 +++++++++++++++++++++++++++++++++++++
- .superpowers/sdd/task-3-brief.md   |  62 +++++++++
- .superpowers/sdd/task-3-report.md  |  30 ++++
- test/carousel.test.js              |  35 +++++
- web/index.html                     |   1 +
- web/js/carousel.js                 | 102 ++++++++++++++
- web/js/main.js                     |  49 +++++--
- web/js/page-render.js              |   6 +-
- web/qa-task3.png                   | Bin 0 -> 70331 bytes
- 10 files changed, 549 insertions(+), 13 deletions(-)
 
 diff --git a/test/carousel.test.js b/test/carousel.test.js
 new file mode 100644
-index 0000000..f49a984
+index 0000000..4aefda1
 --- /dev/null
 +++ b/test/carousel.test.js
-@@ -0,0 +1,35 @@
+@@ -0,0 +1,40 @@
 +const { test } = require('node:test');
 +const assert = require('node:assert');
 +const { createCarousel } = require('../web/js/carousel.js');
@@ -53,9 +42,14 @@ index 0000000..f49a984
 +  c.activeAlarms([]); t = 300002;
 +  assert.equal(c.tick(), 3); // 回到 NORMAL 从当前页继续
 +});
++test('不传 dwell 时缺省 300000', () => {
++  let t = 0; const c = createCarousel({ pageCount: 4, now: () => t });
++  t = 299999; assert.equal(c.tick(), 0); // 缺省 dwell 内不切页
++  t = 300001; assert.equal(c.tick(), 1); // 超过缺省 dwell 切页
++});
 diff --git a/web/js/carousel.js b/web/js/carousel.js
 new file mode 100644
-index 0000000..07e3a94
+index 0000000..ba96d99
 --- /dev/null
 +++ b/web/js/carousel.js
 @@ -0,0 +1,102 @@
@@ -72,7 +66,7 @@ index 0000000..07e3a94
 +
 +  function createCarousel(opts) {
 +    var pageCount = opts.pageCount;
-+    var dwell = opts.dwell;
++    var dwell = opts.dwell != null ? opts.dwell : 300000; // 缺省 5 分钟
 +    var now = opts.now || function () { return Date.now(); };
 +
 +    var mode = 'NORMAL';

@@ -3,3 +3,4 @@ Task 0: complete (scaffold, git init)
 Task 1: complete (a39b8cd, review clean; Minor: 跨界fills丢失2块/banner未作装饰/mkdir副作用/站点数断言弱化)
 
 Task 2: complete (6149f2c, review clean; Minor: 单次rAF淡入可能跳变/main.js小幅越界/module.exports死代码)
+Task 3: complete (4f19748+0ade782, review clean after dwell fix; Minor: ALARM_MULTI隐式fallback无注释/main.js双渲染路径冗余/报警清空重置dwell语义)
