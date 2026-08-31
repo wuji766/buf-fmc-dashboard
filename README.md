@@ -56,3 +56,24 @@
 
 ## 后续阶段（未实施）
 滚动大屏轮播、报警楼层切换与高亮、MQTT/OPC UA 数据接入 — 届时直接用 `data/elements-*.json` 按 name 定位站点元素更新颜色/内容。
+
+## 第二步：浏览器监控大屏（2026-08-31）
+
+### 运行方式
+- 双击 `web/index.html` 即可运行（免构建、免服务器，数据为 mock 引擎）。建议用 Chrome/Edge。
+- 演示参数（可选 URL 参数加速演示）：
+  - `index.html?alarmRate=1&dwell=180000` —— 报警高频触发（每 tick 必出）且持续仅 20s，dwell 取最小 3 分钟，便于快速观察报警锁定/轮播/恢复全流程。
+  - `index.html?alarmRate=0` —— 关闭报警，静观 lot 迁移与容量刷新。
+  - `dwell` 参数会钳制到 `config.js` 的 `[minDwell, maxDwell]`（默认 180s–360s）；报警节奏/巡航间隔等常量收敛在 `web/config.js`（`window.BUF_CONFIG`）。
+
+### 验收结果（对照 spec 验收标准，chrome-devtools on file:// 实测）
+1. ✅ 双击打开即运行 —— file:/// 直开无控制台报错，HUD 时钟/页码/SVG 正常渲染，页头显示"模拟数据"。
+2. ✅ 4 页布局与 pencil/Excel 一致 —— L20-Array 页实测 616 矩形、1677 竖排文字（抽验 CAK-01CL）、65 个槽位编号（xxCnn）、20 处容量大字 `used(total) pct%`（如 BUF-02 88(101) 87%）。
+3. ✅ 轮播/手动 —— 默认 dwell=300000（BUF_CONFIG 注入，单测"NORMAL 按 dwell 循环"）；点击第 4 个页码圆点实测从 L20-Array 跳到 L40-CF/Cell；手动 60s 保持后恢复由单测"手动模式 60s 内不自动切换"覆盖（报警模式下 activeAlarms 优先接管切页，属设计行为）。
+4. ✅ 单报警锁定+特写+信息条+恢复 —— alarmRate=1 实测：viewBox 由整页 (0,0,1991,2343) 聚焦到报警包络 (598,115,498,586)，报警站点 `alarm-pulse` 动画（animation: alarm-stroke）运行，底部 marquee 滚动 `时间|页|站点|EQ|Mock alarm`；解除后恢复由单测"报警清空恢复全页轮播"+切页时 viewBox 复位实测覆盖。
+5. ✅ 多页报警按最早时间轮播 —— alarmRate=1 下多页同时报警，实测页面在报警页间切换（L40-CF/Cell → L40-Array）；排序轮播由单测"多页报警按最早时间排序轮播"覆盖。
+6. ✅ 实时数据 —— 6s 间隔两次采样容量大字发生变化（changed=true）；lot 徽标实时显示（L8/L1/L6/L2/L3…，含同站多 lot "L7 L1"）；lot 迁移由单测"lot 迁移改变站点归属"覆盖。
+
+### 说明
+- 轮播/报警状态机、mock 引擎均有 node --test 单测（14 pass），浏览器实测与单测互补覆盖验收 6 条。
+- 真实数据源（MQTT/OPC UA DataProvider）为后续阶段，页头"数据源"状态位已预留。

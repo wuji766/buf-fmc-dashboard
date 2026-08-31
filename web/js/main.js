@@ -1,7 +1,30 @@
 /* BUF FMC 大屏 —— 装配入口：渲染 + 轮播状态机 + 时钟 + 实时数据 */
 (function () {
-  var DWELL = 300000;      // 自动换页间隔 5 分钟
-  var DATA_INTERVAL = 2000; // 数据刷新间隔 2s
+  var CFG = window.BUF_CONFIG || {};
+  function cfg(name, def) { return CFG[name] != null ? CFG[name] : def; }
+  var DWELL = cfg('dwell', 300000);       // 自动换页间隔（config.js 可调）
+  var MIN_DWELL = cfg('minDwell', 180000);
+  var MAX_DWELL = cfg('maxDwell', 360000);
+  var MANUAL_HOLD = cfg('manualRecovery', 60000);
+  var CRUISE_INTERVAL = cfg('cruiseInterval', 20000);
+  var DATA_INTERVAL = 2000;               // 数据刷新间隔 2s
+
+  /* URL 参数（演示加速）：?dwell=ms（钳到 [minDwell,maxDwell]）& alarmRate=0..1
+   * alarmRate=1 时 mock 用 forceAlarmRate=1 + alarmDurationMs=20000，报警高频短持续便于演示 */
+  var qs = {};
+  location.search.replace(/^\?/, '').split('&').forEach(function (kv) {
+    var p = kv.split('=');
+    if (p[0]) qs[decodeURIComponent(p[0])] = decodeURIComponent(p[1] || '');
+  });
+  if (qs.dwell != null && isFinite(+qs.dwell)) {
+    DWELL = Math.max(MIN_DWELL, Math.min(MAX_DWELL, +qs.dwell));
+  }
+  var mockOpts = { pages: window.BUF_PAGES };
+  if (qs.alarmRate != null && isFinite(+qs.alarmRate)) {
+    var rate = Math.max(0, Math.min(1, +qs.alarmRate));
+    mockOpts.forceAlarmRate = rate;
+    if (rate >= 1) mockOpts.alarmDurationMs = 20000;
+  }
 
   /* 时钟：YYYY-MM-DD HH:mm:ss */
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
@@ -40,6 +63,7 @@
   var carousel = BUF.carousel.createCarousel({
     pageCount: BUF.render.pageCount(),
     dwell: DWELL,
+    manualHold: MANUAL_HOLD,
     now: function () { return Date.now(); }
   });
   carousel.onTurn(function (i) {
@@ -67,7 +91,7 @@
     cruiseIdx = 0; cruiseSig = '';
   }
 
-  var provider = BUF.mock.createMockProvider({ pages: window.BUF_PAGES });
+  var provider = BUF.mock.createMockProvider(mockOpts);
   provider.start(function (snap) {
     var byPageStations = {}, byPageLots = {};
     (snap.stations || []).forEach(function (st) {
@@ -129,7 +153,7 @@
             if (!tg.length) return;
             cruiseIdx = (cruiseIdx + 1) % tg.length;
             BUF.alarm.focus(i, tg[cruiseIdx]);
-          }, 20000);
+          }, CRUISE_INTERVAL);
         }
       }
     } else {

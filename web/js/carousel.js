@@ -7,11 +7,10 @@
  * alarms[i].pageId 即页索引（由调用方保证）。
  */
 (function () {
-  var MANUAL_HOLD = 60000;
-
   function createCarousel(opts) {
     var pageCount = opts.pageCount;
     var dwell = opts.dwell != null ? opts.dwell : 300000; // 缺省 5 分钟
+    var manualHold = opts.manualHold != null ? opts.manualHold : 60000; // 缺省 60s
     var now = opts.now || function () { return Date.now(); };
 
     var mode = 'NORMAL';
@@ -59,7 +58,7 @@
 
     function manual(i) {
       if (i < 0 || i >= pageCount) return page;
-      manualUntil = now() + MANUAL_HOLD;
+      manualUntil = now() + manualHold;
       wasManual = true;
       goTo(i);
       return page;
