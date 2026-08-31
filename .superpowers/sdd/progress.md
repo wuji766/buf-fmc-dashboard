@@ -7,3 +7,4 @@ Task 3: complete (4f19748+0ade782, review clean after dwell fix; Minor: ALARM_MU
 Task 4: complete (93f8e96+baa3d70+4186130, review clean after 3 rounds; Minor: 报警回填初始色非实时色/tickTime不drift)
 Task 5: complete (63c42b0+316a06b, review clean; Minor: bar未转义HTML/cruise分支lastEnvVB未清空/siteId带容量文本上游问题)
 Task 6: complete (209e684, review clean; Minor: URL解码容错/20000魔法数/截图入库)
+Final review: mergeable, fixes d3fa5be (cruise reset/escapeHtml/cross-boundary fills/README test cmd). All tasks complete.
