@@ -7,9 +7,6 @@
   var STATUSES = ['normal', 'preFull', 'full'];
   var PER_TICK_ALARM_RATE = 0.0033; // 2s 一 tick → 每页每分钟约 10%
 
-  var rand = Math.random; // 可注入随机源（createMockProvider 内按 opts.rand 重设）
-  function rnd(a, b) { return a + rand() * (b - a); }
-  function ri(a, b) { return Math.floor(rnd(a, b + 1)); }
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 
   function createMockProvider(opts) {
@@ -21,7 +18,10 @@
     var alarmDurMs = opts.alarmDurationMs; // 缺省 1-5 分钟
     var nowFn = opts.now || function () { return Date.now(); };
 
-    var rand = opts.rand || Math.random; // 可注入随机源（测试确定性用）
+    // 随机源（可注入）：rnd/ri 定义在此闭包内，opts.rand 对所有随机调用生效
+    var rand = opts.rand || Math.random;
+    function rnd(a, b) { return a + rand() * (b - a); }
+    function ri(a, b) { return Math.floor(rnd(a, b + 1)); }
     var tOffset = 0; // 虚拟时间偏移（tickTime 推进）
     function now() { return nowFn() + tOffset; }
 

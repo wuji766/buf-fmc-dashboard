@@ -39,3 +39,9 @@
 - test#3 改为真实迁移断言：注入固定种子随机源（opts.rand，LCG seed=42）+ tickTime(8000) 越过 nextMove 上限，断言 4 个 lot 归属 notDeepEqual 且 sinceTs 均为数字。
 - 顺手修：applyLots 徽标 y 钳制 Math.max(1, r.y-11) 防页顶越界。
 - 验证：node --test 全量 11 pass / 0 fail。
+
+## 修复 2（复核 Critical：随机源注入作用域错误）
+
+- 问题：rnd/ri 原定义在 IIFE 外层、闭包捕获外层 rand；createMockProvider 内 var rand=opts.rand 只遮蔽函数内作用域，ri()（站点挑选/nextMove）实际仍走 Math.random，测试注入失效 → 约 6% 概率假失败（review 复跑第 1 次即失败）。
+- 修复（方案 1）：把 rand/rnd/ri 下沉到 createMockProvider 闭包内，删除外层副本；opts.rand 现在对所有随机调用（站点挑选、nextMove、状态翻转、报警 roll）全部生效；更正注释。
+- 验证：node --test 全量 11 pass / 0 fail；连跑 40 次 node --test test/mock-provider.test.js：40 PASS / 0 FAIL。
