@@ -93,8 +93,10 @@
       if (j === i) {
         g.removeAttribute('display');
         g.setAttribute('opacity', '0');
-        // 触发 CSS opacity 过渡
-        requestAnimationFrame(function () { g.setAttribute('opacity', '1'); });
+        // 触发 CSS opacity 过渡（双重 rAF 确保初始 opacity=0 先完成布局）
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () { g.setAttribute('opacity', '1'); });
+        });
       } else {
         g.setAttribute('display', 'none');
       }
