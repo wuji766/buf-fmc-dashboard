@@ -1,0 +1,270 @@
+4f19748 feat: carousel state machine with alarm lock/rotation
+
+ .superpowers/sdd/progress.md       |   1 +
+ .superpowers/sdd/review-task2.diff | 276 +++++++++++++++++++++++++++++++++++++
+ .superpowers/sdd/task-3-brief.md   |  62 +++++++++
+ .superpowers/sdd/task-3-report.md  |  30 ++++
+ test/carousel.test.js              |  35 +++++
+ web/index.html                     |   1 +
+ web/js/carousel.js                 | 102 ++++++++++++++
+ web/js/main.js                     |  49 +++++--
+ web/js/page-render.js              |   6 +-
+ web/qa-task3.png                   | Bin 0 -> 70331 bytes
+ 10 files changed, 549 insertions(+), 13 deletions(-)
+
+diff --git a/test/carousel.test.js b/test/carousel.test.js
+new file mode 100644
+index 0000000..f49a984
+--- /dev/null
++++ b/test/carousel.test.js
+@@ -0,0 +1,35 @@
++const { test } = require('node:test');
++const assert = require('node:assert');
++const { createCarousel } = require('../web/js/carousel.js');
++
++test('NORMAL 按 dwell 循环', () => {
++  let t = 0; const c = createCarousel({ pageCount: 4, dwell: 300000, now: () => t });
++  const seq = [];
++  c.onTurn(i => seq.push(i));
++  t = 300001; assert.equal(c.tick(), 1);           // 0->1
++  t = 600001; assert.equal(c.tick(), 2);
++  assert.deepEqual(seq, [1, 2]);
++});
++test('单页报警锁定', () => {
++  let t = 0; const c = createCarousel({ pageCount: 4, dwell: 300000, now: () => t });
++  c.activeAlarms([{ pageId: 2, ts: 100 }]);
++  t = 999999; assert.equal(c.tick(), 2); assert.equal(c.currentPage(), 2);
++});
++test('多页报警按最早时间排序轮播', () => {
++  let t = 0; const c = createCarousel({ pageCount: 4, dwell: 300000, now: () => t });
++  c.activeAlarms([{ pageId: 3, ts: 500 }, { pageId: 1, ts: 100 }]);
++  t = 1; assert.equal(c.tick(), 1);                 // 先切最早报警页1
++  t = 300002; assert.equal(c.tick(), 3);            // 再页3
++  t = 600003; assert.equal(c.tick(), 1);            // 循环
++});
++test('手动模式 60s 内不自动切换', () => {
++  let t = 0; const c = createCarousel({ pageCount: 4, dwell: 300000, now: () => t });
++  c.manual(3); t = 59999; assert.equal(c.tick(), 3); // 手动保持
++  t = 61000; assert.equal(c.tick(), 0);              // 恢复自动
++});
++test('报警清空恢复全页轮播', () => {
++  let t = 0; const c = createCarousel({ pageCount: 4, dwell: 300000, now: () => t });
++  c.activeAlarms([{ pageId: 2, ts: 1 }]); c.tick();
++  c.activeAlarms([]); t = 300002;
++  assert.equal(c.tick(), 3); // 回到 NORMAL 从当前页继续
++});
+diff --git a/web/js/carousel.js b/web/js/carousel.js
+new file mode 100644
+index 0000000..07e3a94
+--- /dev/null
++++ b/web/js/carousel.js
+@@ -0,0 +1,102 @@
++/* BUF FMC 大屏 —— 轮播状态机（纯逻辑，浏览器/Node 双端）
++ * 状态：
++ *   NORMAL       全页循环（dwell 到期 → 下一页，环绕）
++ *   ALARM_SINGLE 锁定唯一报警页
++ *   ALARM_MULTI  报警页按最早报警 ts 升序轮播（dwell 到期 → 下一个报警页，环绕）
++ * 手动模式：manual(i) 后 60s 内 tick 不切页，超时自动恢复。
++ * alarms[i].pageId 即页索引（由调用方保证）。
++ */
++(function () {
++  var MANUAL_HOLD = 60000;
++
++  function createCarousel(opts) {
++    var pageCount = opts.pageCount;
++    var dwell = opts.dwell;
++    var now = opts.now || function () { return Date.now(); };
++
++    var mode = 'NORMAL';
++    var page = 0;               // 当前页索引
++    var pageStartTs = now();    // 当前页开始展示时间
++    var manualUntil = 0;        // 手动模式截止时间
++    var wasManual = false;      // 手动模式刚结束（首个 tick 立即切页）
++    var alarmPages = [];        // 排序后的报警页索引（ts 升序）
++    var listeners = [];
++
++    function emit(i) {
++      for (var k = 0; k < listeners.length; k++) listeners[k](i);
++    }
++
++    function goTo(i) {
++      if (i === page) return;
++      page = i;
++      pageStartTs = now();
++      emit(i);
++    }
++
++    function advance() {
++      if (mode === 'NORMAL') {
++        goTo((page + 1) % pageCount);
++      } else if (mode === 'ALARM_MULTI') {
++        var idx = alarmPages.indexOf(page);
++        goTo(alarmPages[(idx + 1) % alarmPages.length]);
++      }
++      // ALARM_SINGLE：锁定，不切换（goTo 已在 activeAlarms 时完成）
++    }
++
++    function tick() {
++      var t = now();
++      if (t < manualUntil) return page;         // 手动模式：保持
++      if (wasManual) {                          // 手动刚超时：恢复自动并立即切页
++        wasManual = false;
++        pageStartTs = t;
++        advance();
++        return page;
++      }
++      if (t - pageStartTs < dwell) return page; // 未到 dwell：保持
++      advance();
++      return page;
++    }
++
++    function manual(i) {
++      if (i < 0 || i >= pageCount) return page;
++      manualUntil = now() + MANUAL_HOLD;
++      wasManual = true;
++      goTo(i);
++      return page;
++    }
++
++    function activeAlarms(alarms) {
++      alarms = alarms || [];
++      var t = now();
++      var sorted = alarms.slice().sort(function (a, b) { return a.ts - b.ts; });
++      alarmPages = sorted.map(function (a) { return a.pageId; });
++      if (alarmPages.length === 0) {
++        mode = 'NORMAL';
++        pageStartTs = t; // 从当前页重新计 dwell
++      } else if (alarmPages.length === 1) {
++        mode = 'ALARM_SINGLE';
++        goTo(alarmPages[0]);
++      } else {
++        mode = 'ALARM_MULTI';
++        goTo(alarmPages[0]);
++      }
++      return page;
++    }
++
++    function currentPage() { return page; }
++
++    return {
++      tick: tick,
++      manual: manual,
++      activeAlarms: activeAlarms,
++      currentPage: currentPage,
++      onTurn: function (cb) { if (typeof cb === 'function') listeners.push(cb); }
++    };
++  }
++
++  if (typeof window !== 'undefined') {
++    window.BUF = window.BUF || {};
++    window.BUF.carousel = { createCarousel: createCarousel };
++  }
++  if (typeof module !== 'undefined') module.exports = { createCarousel: createCarousel };
++})();
+diff --git a/web/js/main.js b/web/js/main.js
+index 4ea7a7d..30cab11 100644
+--- a/web/js/main.js
++++ b/web/js/main.js
+@@ -1,33 +1,60 @@
+-/* 临时骨架联调入口（Task 3 重写：时钟/报警/数据绑定） */
++/* BUF FMC 大屏 —— 装配入口：渲染 + 轮播状态机 + 时钟 */
+ (function () {
+-  function tick() {
++  var DWELL = 300000; // 自动换页间隔 5 分钟
++
++  /* 时钟：YYYY-MM-DD HH:mm:ss */
++  function pad(n) { return n < 10 ? '0' + n : '' + n; }
++  function clockText(d) {
++    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
++      ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
++  }
++  function tickClock() {
+     var c = document.getElementById('clock');
+-    if (c) c.textContent = new Date().toLocaleString('zh-CN', { hour12: false });
++    if (c) c.textContent = clockText(new Date());
+   }
+-  function buildPager() {
++
++  /* 页码导航 */
++  function buildPager(onDot) {
+     var nav = document.getElementById('pager');
+     if (!nav) return;
+     for (var i = 0; i < BUF.render.pageCount(); i++) {
+       (function (idx) {
+         var d = document.createElement('span');
+         d.className = 'dot' + (idx === 0 ? ' on' : '');
+-        d.onclick = function () { BUF.render.show(idx); syncPager(); };
++        d.onclick = function () { onDot(idx); };
+         nav.appendChild(d);
+       })(i);
+     }
+   }
+   function syncPager() {
+     var dots = document.querySelectorAll('#pager .dot');
+     dots.forEach(function (d, j) { d.className = 'dot' + (j === BUF.render.cur() ? ' on' : ''); });
+   }
++
++  function show(i) {
++    if (i === BUF.render.cur()) return;
++    BUF.render.show(i);
++    syncPager();
++  }
++
++  /* 装配 */
+   BUF.render.init();
+   BUF.render.show(0);
+-  buildPager();
+-  tick();
+-  setInterval(tick, 1000);
+-  // 5s 轮播（临时）
++
++  var carousel = BUF.carousel.createCarousel({
++    pageCount: BUF.render.pageCount(),
++    dwell: DWELL,
++    now: function () { return Date.now(); }
++  });
++
++  carousel.onTurn(function (i) { show(i); });
++  buildPager(function (i) { carousel.manual(i); show(i); });
++
++  tickClock();
+   setInterval(function () {
+-    BUF.render.show((BUF.render.cur() + 1) % BUF.render.pageCount());
++    var p = carousel.tick();
++    if (p !== null && p !== BUF.render.cur()) BUF.render.show(p);
+     syncPager();
+-  }, 5000);
++    tickClock();
++  }, 1000);
+ })();
+diff --git a/web/js/page-render.js b/web/js/page-render.js
+index 1867d64..791d210 100644
+--- a/web/js/page-render.js
++++ b/web/js/page-render.js
+@@ -86,22 +86,24 @@
+       return g;
+     });
+   }
+ 
+   function show(i) {
+     if (i < 0 || i >= pages.length) return null;
+     groups.forEach(function (g, j) {
+       if (j === i) {
+         g.removeAttribute('display');
+         g.setAttribute('opacity', '0');
+-        // 触发 CSS opacity 过渡
+-        requestAnimationFrame(function () { g.setAttribute('opacity', '1'); });
++        // 触发 CSS opacity 过渡（双重 rAF 确保初始 opacity=0 先完成布局）
++        requestAnimationFrame(function () {
++          requestAnimationFrame(function () { g.setAttribute('opacity', '1'); });
++        });
+       } else {
+         g.setAttribute('display', 'none');
+       }
+     });
+     svg.setAttribute('viewBox', '0 0 ' + pages[i].W + ' ' + pages[i].H);
+     cur = i;
+     const nm = document.getElementById('pageName');
+     if (nm) nm.textContent = pages[i].name;
+     return pages[i];
+   }

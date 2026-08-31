@@ -11,7 +11,7 @@
 
   function createCarousel(opts) {
     var pageCount = opts.pageCount;
-    var dwell = opts.dwell;
+    var dwell = opts.dwell != null ? opts.dwell : 300000; // 缺省 5 分钟
     var now = opts.now || function () { return Date.now(); };
 
     var mode = 'NORMAL';

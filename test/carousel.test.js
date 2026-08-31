@@ -33,3 +33,8 @@ test('报警清空恢复全页轮播', () => {
   c.activeAlarms([]); t = 300002;
   assert.equal(c.tick(), 3); // 回到 NORMAL 从当前页继续
 });
+test('不传 dwell 时缺省 300000', () => {
+  let t = 0; const c = createCarousel({ pageCount: 4, now: () => t });
+  t = 299999; assert.equal(c.tick(), 0); // 缺省 dwell 内不切页
+  t = 300001; assert.equal(c.tick(), 1); // 超过缺省 dwell 切页
+});

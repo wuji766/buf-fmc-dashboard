@@ -28,3 +28,21 @@
 
 ## 提交
 - `feat: carousel state machine with alarm lock/rotation`
+
+## 审查修复（Important）：dwell 缺省值
+- 问题：`carousel.js` 中 `var dwell = opts.dwell;` 无默认值，不传 dwell 时 `t - pageStartTs < dwell` 恒为 false，每个 tick 都切页，违反绑定约束。
+- 修复：改为 `var dwell = opts.dwell != null ? opts.dwell : 300000;`（缺省 5 分钟）。
+- 补充用例 `不传 dwell 时缺省 300000`：t=299999 时 tick 返回 0（不切页）；t=300001 时 tick 返回 1（切页）。
+- 测试输出（`node --test test/carousel.test.js`）：
+
+```
+✔ NORMAL 按 dwell 循环 (2.903ms)
+✔ 单页报警锁定 (0.3847ms)
+✔ 多页报警按最早时间排序轮播 (0.2528ms)
+✔ 手动模式 60s 内不自动切换 (0.2602ms)
+✔ 报警清空恢复全页轮播 (0.2139ms)
+✔ 不传 dwell 时缺省 300000 (0.3268ms)
+ℹ tests 6  ℹ pass 6  ℹ fail 0
+```
+
+- 提交：`fix: default dwell 300000 in carousel`
