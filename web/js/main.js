@@ -46,6 +46,7 @@
     if (i === BUF.render.cur()) return;
     stopCruise();
     focused = false;
+    lastEnvVB = null;
     BUF.render.show(i);   // 重置整页 viewBox
     BUF.alarm.reset(i);   // 保险：viewBox 回整页，等下一 snapshot 重新聚焦
     syncPager();
@@ -60,6 +61,7 @@
   /* 报警相机状态：cruise 定时器 / 聚焦标记（避免每 2s snapshot 重复动画） */
   var cruiseTimer = null, cruiseIdx = 0, cruiseSig = '', focused = false;
   var lastAlarmRects = []; // 最近一次 snapshot 的当前页报警矩形（cruise 定时器用）
+  var lastEnvVB = null;    // envelope 模式上次聚焦的 viewBox（变化检测，报警点增减/移动时重新取景）
   function stopCruise() {
     if (cruiseTimer != null) { clearInterval(cruiseTimer); cruiseTimer = null; }
     cruiseIdx = 0; cruiseSig = '';
@@ -107,7 +109,12 @@
       var cam = BUF.alarm.computeCamera(curPage, alarmRects, {});
       if (cam.mode === 'envelope') {
         stopCruise();
-        if (!focused) { BUF.alarm.focus(cur, cam.viewBox); focused = true; }
+        // 报警点新增/移动 → 目标 viewBox 变化 → 重新取景（sameViewBox 容差 1 单位）
+        if (!focused || !BUF.alarm.sameViewBox(lastEnvVB, cam.viewBox)) {
+          BUF.alarm.focus(cur, cam.viewBox);
+          focused = true;
+        }
+        lastEnvVB = cam.viewBox.slice();
       } else {
         var sig = alarmRects.map(function (r) { return r.x + ',' + r.y; }).join(';');
         if (sig !== cruiseSig) { stopCruise(); cruiseSig = sig; }
@@ -128,6 +135,7 @@
     } else {
       stopCruise();
       if (focused) { BUF.alarm.reset(cur); focused = false; }
+      lastEnvVB = null;
     }
 
     carousel.activeAlarms(active.map(function (a) {

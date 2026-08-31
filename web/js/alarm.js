@@ -58,6 +58,15 @@
     return { viewBox: targets[0], mode: 'cruise', cruiseTargets: targets };
   }
 
+  /* 两个 viewBox 是否视为同一取景（各分量差 ≤ tol，默认 1 单位）
+   * 纯函数：供 main.js 在 envelope 分支做变化检测（报警点新增/移动时重新取景） */
+  function sameViewBox(a, b, tol) {
+    if (tol == null) tol = 1;
+    if (!a || !b || a.length !== 4 || b.length !== 4) return false;
+    for (var k = 0; k < 4; k++) if (Math.abs(a[k] - b[k]) > tol) return false;
+    return true;
+  }
+
   /* ---- 浏览器端：SVG 相机动画 ---- */
   var animId = 0;
 
@@ -134,7 +143,7 @@
 
   if (typeof window !== 'undefined') {
     window.BUF = window.BUF || {};
-    window.BUF.alarm = { computeCamera: computeCamera, focus: focus, reset: reset, bar: bar };
+    window.BUF.alarm = { computeCamera: computeCamera, sameViewBox: sameViewBox, focus: focus, reset: reset, bar: bar };
   }
-  if (typeof module !== 'undefined') module.exports = { computeCamera: computeCamera };
+  if (typeof module !== 'undefined') module.exports = { computeCamera: computeCamera, sameViewBox: sameViewBox };
 })();

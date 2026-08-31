@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { computeCamera } = require('../web/js/alarm.js');
+const { computeCamera, sameViewBox } = require('../web/js/alarm.js');
 const page = { W: 2000, H: 2300 };
 const one = [{ x: 100, y: 100, w: 27, h: 52 }, { x: 1500, y: 900, w: 27, h: 52 }];
 
@@ -15,4 +15,21 @@ test('分散报警点→巡航模式', () => {
   const c = computeCamera(page, one, {});
   assert.equal(c.mode, 'cruise');
   assert.equal(c.cruiseTargets.length, 2);
+});
+
+test('sameViewBox：envelope 变化检测（报警点增减/移动触发重新取景）', () => {
+  // 页中部相邻两点（不触发边界钳制，取景随包络中心变化）
+  const near = [{ x: 900, y: 1000, w: 27, h: 52 }, { x: 930, y: 1100, w: 27, h: 52 }];
+  const a = computeCamera(page, near, {}).viewBox;
+  assert.equal(computeCamera(page, near, {}).mode, 'envelope');
+  // 同一集合再算一次 → 同一取景，不应重新 focus
+  assert.ok(sameViewBox(a, computeCamera(page, near.slice(), {}).viewBox));
+  // 新增报警点 → 包络中心移动 → 不同取景
+  const grown = near.concat([{ x: 1400, y: 1600, w: 27, h: 52 }]);
+  assert.ok(!sameViewBox(a, computeCamera(page, grown, {}).viewBox));
+  // 容差 ≤1 单位视为相同
+  const b = a.slice(); b[0] += 0.5; b[3] -= 0.5;
+  assert.ok(sameViewBox(a, b));
+  assert.ok(!sameViewBox(a, null));
+  assert.ok(!sameViewBox(null, a));
 });
