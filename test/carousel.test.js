@@ -38,3 +38,16 @@ test('不传 dwell 时缺省 300000', () => {
   t = 299999; assert.equal(c.tick(), 0); // 缺省 dwell 内不切页
   t = 300001; assert.equal(c.tick(), 1); // 超过缺省 dwell 切页
 });
+test('连续空→空不重置 dwell（修：轮播卡死在 4:59-5:00）', () => {
+  let t = 0; const c = createCarousel({ pageCount: 4, dwell: 300000, now: () => t });
+  c.activeAlarms([]); t = 100000; c.activeAlarms([]); t = 200000; c.activeAlarms([]);
+  t = 300001; assert.equal(c.tick(), 1); // 重复空 snapshot 后 dwell 仍到期切页
+});
+test('报警→清空只重置一次 dwell，后续空 snapshot 不再重置', () => {
+  let t = 0; const c = createCarousel({ pageCount: 4, dwell: 300000, now: () => t });
+  c.activeAlarms([{ pageId: 2, ts: 1 }]); c.tick();
+  t = 100000; c.activeAlarms([]);        // 真实迁移：dwell 从 100000 重计
+  t = 150000; c.activeAlarms([]);        // 空→空：不得重置
+  t = 250000; c.activeAlarms([]);
+  t = 400001; assert.equal(c.tick(), 3); // 100000+300000 到期即切，而非 250000+300000
+});

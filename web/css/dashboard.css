@@ -22,6 +22,7 @@ body {
   letter-spacing: 1px;
 }
 #pageName { color: #7fd4ff; font-weight: 700; }
+#zoomHint { color: #4a6b8a; font-size: 13px; letter-spacing: 0; margin-left: 24px; }
 #clock { color: #9fb8cc; font-variant-numeric: tabular-nums; }
 #srcState.ok { color: #3fe08a; }
 #srcState.err { color: #ff5f5f; }
@@ -130,19 +131,28 @@ body {
   50%      { stroke: #ff7070; stroke-width: 6; }
 }
 
-/* 右下角页码指示器 */
+/* 右下角页码指示器：带页名的按钮组 */
 #pager {
   position: fixed;
   right: 18px;
-  bottom: 14px;
+  bottom: 78px; /* 避开页脚（图例 30px + 报警条 40px） */
   display: flex;
   gap: 8px;
 }
-#pager .dot {
-  width: 14px; height: 14px;
-  border-radius: 50%;
+#pager .pgBtn {
+  padding: 5px 12px;
   border: 1px solid #3f6f9f;
-  background: transparent;
+  border-radius: 4px;
+  background: rgba(6, 16, 28, 0.82);
+  color: #8fb4d4;
+  font: 14px 'Roboto Condensed', 'Noto Sans SC', sans-serif;
+  letter-spacing: 0.5px;
   cursor: pointer;
 }
-#pager .dot.on { background: #7fd4ff; border-color: #7fd4ff; }
+#pager .pgBtn:hover { border-color: #7fd4ff; color: #cfe8ff; }
+#pager .pgBtn.on {
+  background: #7fd4ff;
+  border-color: #7fd4ff;
+  color: #06101c;
+  font-weight: 700;
+}

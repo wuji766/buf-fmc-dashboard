@@ -70,8 +70,12 @@
       var sorted = alarms.slice().sort(function (a, b) { return a.ts - b.ts; });
       alarmPages = sorted.map(function (a) { return a.pageId; });
       if (alarmPages.length === 0) {
-        mode = 'NORMAL';
-        pageStartTs = t; // 从当前页重新计 dwell
+        // 仅在真实模式迁移（报警态→NORMAL）时重置 dwell；
+        // 连续空→空（每 2s snapshot 的常态）不得重置，否则永不切页
+        if (mode !== 'NORMAL') {
+          mode = 'NORMAL';
+          pageStartTs = t; // 从当前页重新计 dwell
+        }
       } else if (alarmPages.length === 1) {
         mode = 'ALARM_SINGLE';
         goTo(alarmPages[0]);

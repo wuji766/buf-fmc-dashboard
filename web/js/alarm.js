@@ -79,6 +79,9 @@
   /* ---- 浏览器端：SVG 相机动画 ---- */
   var animId = 0;
 
+  /* 取消进行中的相机动画（用户手动缩放/拖拽时调用，防止动画回写覆盖） */
+  function cancelAnim() { animId++; }
+
   function getViewBox(svg) {
     var v = (svg.getAttribute('viewBox') || '').trim().split(/[\s,]+/).map(Number);
     return v.length === 4 && v.every(isFinite) ? v : [0, 0, 100, 100];
@@ -158,7 +161,7 @@
 
   if (typeof window !== 'undefined') {
     window.BUF = window.BUF || {};
-    window.BUF.alarm = { computeCamera: computeCamera, sameViewBox: sameViewBox, focus: focus, reset: reset, bar: bar };
+    window.BUF.alarm = { computeCamera: computeCamera, sameViewBox: sameViewBox, focus: focus, reset: reset, bar: bar, cancelAnim: cancelAnim };
   }
   if (typeof module !== 'undefined') module.exports = { computeCamera: computeCamera, sameViewBox: sameViewBox };
 })();

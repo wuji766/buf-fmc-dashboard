@@ -37,27 +37,31 @@
     if (c) c.textContent = clockText(new Date());
   }
 
-  /* 页码导航 */
+  /* 页码导航：带页名的按钮组（当前页高亮，点击直达） */
   function buildPager(onDot) {
     var nav = document.getElementById('pager');
     if (!nav) return;
     for (var i = 0; i < BUF.render.pageCount(); i++) {
       (function (idx) {
-        var d = document.createElement('span');
-        d.className = 'dot' + (idx === 0 ? ' on' : '');
-        d.onclick = function () { onDot(idx); };
-        nav.appendChild(d);
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'pgBtn' + (idx === 0 ? ' on' : '');
+        b.textContent = BUF.render.page(idx).name;
+        b.title = '第 ' + (idx + 1) + ' 页';
+        b.onclick = function () { onDot(idx); };
+        nav.appendChild(b);
       })(i);
     }
   }
   function syncPager() {
-    var dots = document.querySelectorAll('#pager .dot');
-    dots.forEach(function (d, j) { d.className = 'dot' + (j === BUF.render.cur() ? ' on' : ''); });
+    var bs = document.querySelectorAll('#pager .pgBtn');
+    bs.forEach(function (b, j) { b.className = 'pgBtn' + (j === BUF.render.cur() ? ' on' : ''); });
   }
 
   /* 装配：渲染 */
   BUF.render.init();
   BUF.render.show(0);
+  BUF.zoom.init();
 
   /* 装配：轮播（切页单一路径：所有切页都经 carousel → onTurn → show） */
   var carousel = BUF.carousel.createCarousel({
@@ -73,6 +77,7 @@
     lastEnvVB = null;
     BUF.render.show(i);   // 重置整页 viewBox
     BUF.alarm.reset(i);   // 保险：viewBox 回整页，等下一 snapshot 重新聚焦
+    BUF.zoom.onPageChange(); // 切页重置用户缩放状态
     syncPager();
   });
   buildPager(function (i) { carousel.manual(i); });
@@ -86,6 +91,7 @@
   var cruiseTimer = null, cruiseIdx = 0, cruiseSig = '', focused = false;
   var lastAlarmRects = []; // 最近一次 snapshot 的当前页报警矩形（cruise 定时器用）
   var lastEnvVB = null;    // envelope 模式上次聚焦的 viewBox（变化检测，报警点增减/移动时重新取景）
+  var lastAlarmSigAll = ''; // 最近一次全局报警集签名（变化时解除用户缩放覆盖）
   function stopCruise() {
     if (cruiseTimer != null) { clearInterval(cruiseTimer); cruiseTimer = null; }
     cruiseIdx = 0; cruiseSig = '';
@@ -141,12 +147,19 @@
     }).map(function (st) { return rectBySite[st.siteId].rect; });
 
     lastAlarmRects = alarmRects;
+    /* 报警集变化 → 解除用户缩放覆盖，恢复自动聚焦 */
+    var alarmSigAll = active.map(function (a) { return a.pageId + ':' + a.siteId + ':' + a.ts; }).sort().join(';');
+    if (alarmSigAll !== lastAlarmSigAll) {
+      lastAlarmSigAll = alarmSigAll;
+      BUF.zoom.clearUserOverride();
+    }
+    var uo = BUF.zoom.userOverride(); // 用户手动缩放/拖拽期间：跳过自动取景
     if (alarmRects.length) {
       var cam = BUF.alarm.computeCamera(curPage, alarmRects, {});
       if (cam.mode === 'envelope') {
         stopCruise();
         // 报警点新增/移动 → 目标 viewBox 变化 → 重新取景（sameViewBox 容差 1 单位）
-        if (!focused || !BUF.alarm.sameViewBox(lastEnvVB, cam.viewBox)) {
+        if (!uo && (!focused || !BUF.alarm.sameViewBox(lastEnvVB, cam.viewBox))) {
           BUF.alarm.focus(cur, cam.viewBox);
           focused = true;
         }
@@ -154,9 +167,10 @@
       } else {
         var sig = alarmRects.map(function (r) { return r.x + ',' + r.y; }).join(';');
         if (sig !== cruiseSig) { stopCruise(); cruiseSig = sig; lastEnvVB = null; }
-        if (!focused) { BUF.alarm.focus(cur, cam.cruiseTargets[cruiseIdx % cam.cruiseTargets.length]); focused = true; }
+        if (!uo && !focused) { BUF.alarm.focus(cur, cam.cruiseTargets[cruiseIdx % cam.cruiseTargets.length]); focused = true; }
         if (cruiseTimer == null) {
           cruiseTimer = setInterval(function () {
+            if (BUF.zoom.userOverride()) return; // 用户接管：暂停自动巡航取景
             var i = BUF.render.cur();
             var pg = BUF.render.page(i);
             if (!pg || !lastAlarmRects.length) return;
@@ -170,7 +184,7 @@
       }
     } else {
       stopCruise();
-      if (focused) { BUF.alarm.reset(cur); focused = false; }
+      if (!uo && focused) { BUF.alarm.reset(cur); focused = false; }
       lastEnvVB = null;
     }
 
@@ -203,14 +217,14 @@
     var t = Date.now();
     if (t < carousel.manualUntil()) {
       el.className = 'manual';
-      el.textContent = '手动浏览';
+      el.textContent = '手动浏览（' + Math.ceil((carousel.manualUntil() - t) / 1000) + ' 秒后恢复自动）';
     } else if (carousel.mode() === 'ALARM_SINGLE') {
       el.className = 'alarm';
-      el.textContent = '报警锁定';
+      el.textContent = '报警锁定（本页有报警）';
     } else if (carousel.mode() === 'ALARM_MULTI') {
       el.className = 'alarm';
       var idx = carousel.alarmIdx();
-      el.textContent = '报警轮播 ' + (idx < 0 ? 1 : idx + 1) + '/' + carousel.alarmPageCount();
+      el.textContent = '报警轮播 ' + (idx < 0 ? 1 : idx + 1) + '/' + carousel.alarmPageCount() + '（按报警时间排序）';
     } else {
       el.className = '';
       el.textContent = '自动轮播 · 下一页 ' + mmss(DWELL - (t - carousel.pageStartTs()));
