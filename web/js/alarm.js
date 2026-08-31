@@ -114,6 +114,11 @@
     return p2(d.getHours()) + ':' + p2(d.getMinutes()) + ':' + p2(d.getSeconds());
   }
 
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
   function bar(alarms) {
     var el = document.getElementById('alarmBar');
     if (!el) return;
@@ -122,7 +127,7 @@
     var sorted = alarms.slice().sort(function (a, b) { return b.ts - a.ts; });
     var items = sorted.map(function (a) {
       var parts = [hhmmss(a.ts), a.pageName || a.pageId || '', a.siteId || '', a.code || '', a.text || ''];
-      var s = parts.join(' | ').replace(/\s+\|/g, ' |').replace(/\|\s+/g, '| ');
+      var s = parts.map(escapeHtml).join(' | ').replace(/\s+\|/g, ' |').replace(/\|\s+/g, '| ');
       return '<span class="alarm-item">' + s + '</span>';
     });
     var content = items.join('<span class="alarm-sep">　◆　</span>');

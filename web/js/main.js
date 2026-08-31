@@ -141,7 +141,7 @@
         lastEnvVB = cam.viewBox.slice();
       } else {
         var sig = alarmRects.map(function (r) { return r.x + ',' + r.y; }).join(';');
-        if (sig !== cruiseSig) { stopCruise(); cruiseSig = sig; }
+        if (sig !== cruiseSig) { stopCruise(); cruiseSig = sig; lastEnvVB = null; }
         if (!focused) { BUF.alarm.focus(cur, cam.cruiseTargets[cruiseIdx % cam.cruiseTargets.length]); focused = true; }
         if (cruiseTimer == null) {
           cruiseTimer = setInterval(function () {

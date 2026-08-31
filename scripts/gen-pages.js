@@ -53,7 +53,7 @@ function splitPages(el, frameName) {
     return page;
   };
   const top = mk('A', 'Array', o => (o.y + (o.h || 0)) <= midY);
-  const bottom = mk('B', 'CF/Cell', o => o.y >= midY);
+  const bottom = mk('B', 'CF/Cell', o => o.y + (o.h || 0) > midY);
   return [top, bottom];
 }
 
