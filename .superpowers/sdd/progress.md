@@ -12,3 +12,4 @@ Feedback round 1: complete (ff9fcb8) - crop viewBox/status bar/legend. Remaining
 Feedback round 2: complete (6e7aa52 + 13f128d, tests 19/19) - dwell reset fix/zoom+pan/labeled nav/per-page borders/pencil-fidelity text. MQTT 接入取消，转为持续优化。残留: 低缩放下 0.75px 网格线偏淡、ALFT 小标签需放大看(设计如此)
 Feedback round 3: complete (e1a487b, tests 19/19, QA harness clean x4 pages) - 根因: 跨页元素ID重名导致状态刷错页; bottom基线系数修正; ?qa=1 程序化核验通道
 Feedback round 4: complete (28666e7 web/data + pen sync 857/857+822/822+Copy L20x2) - shrink-to-fit 全量文字适配, QA: overlap 7/37/4/60->0/2/1/0 overflow->0; 新参照截图 docs/ref/pencil-*-v2.png
+Feedback round 5: complete (320cdf2) - menu.html 模式索引页 + rAF 报警条滚动同步(CDP实测50s/21采样通过); 控制者注: 本轮控制会话曾陷入空转故障已终止
