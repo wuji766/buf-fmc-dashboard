@@ -1,0 +1,1 @@
+Insert(L20x2F,{type:"path",name:"elbow-arrow",x:680.0,y:758.8,width:621.3,height:525.5,viewBox:[0,0,621.3,525.5],geometry:"M601.3 505.4L310.6 505.4L310.6 20L20 20M20 20L30 14L30 26Z",stroke:"#4F81BD",strokeWidth:2,fill:"#4F81BD"})
