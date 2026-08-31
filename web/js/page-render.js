@@ -51,8 +51,8 @@
       } else if (valign === 'top') {
         // 基线 = 盒顶 + 0.8×size（ ascent 近似，dominant-baseline=auto ）
         baseline = 'auto'; ty = aabb.y + 0.8 * size;
-      } else { // bottom：留 descender 余量，不侵入下格
-        baseline = 'auto'; ty = aabb.y + aabb.h - 0.22 * size;
+      } else { // bottom：留 descender 余量（Roboto Condensed 实测 descent≈0.29em），不侵入下格
+        baseline = 'auto'; ty = aabb.y + aabb.h - 0.29 * size;
       }
     }
     const e = el('text', {

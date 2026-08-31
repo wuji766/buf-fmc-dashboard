@@ -16,6 +16,14 @@
     var p = kv.split('=');
     if (p[0]) qs[decodeURIComponent(p[0])] = decodeURIComponent(p[1] || '');
   });
+  /* QA 模式（?qa=1&page=N）：只渲染指定页并跑程序化核验，不启轮播/mock
+   * （mock 的 rewriteCapacity 会改写文字内容，污染 getBBox 测量） */
+  if (qs.qa) {
+    var s = document.createElement('script');
+    s.src = 'js/qa-harness.js';
+    document.body.appendChild(s);
+    return;
+  }
   if (qs.dwell != null && isFinite(+qs.dwell)) {
     DWELL = Math.max(MIN_DWELL, Math.min(MAX_DWELL, +qs.dwell));
   }

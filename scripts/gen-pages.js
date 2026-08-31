@@ -110,6 +110,9 @@ function splitPages(el, frameName) {
   const banners = findBanners(el, frameName);
   const midY = banners[1].top; // 第二条横幅顶 = 上下分界
   const [borderTop, borderBottom] = splitBorderGeo(borderGeoOf(frameName), midY);
+  /* id 后缀全局唯一（L20 用 A/B，L40 用 C/D）：DOM 里四页同存，
+   * 后缀撞车会让 getElementById 命中别页元素（applyStates/QA 全被污染） */
+  const sfx = frameName === 'L20' ? ['A', 'B'] : ['C', 'D'];
   const mk = (suffix, pageName, pred, borderGeo) => {
     const fills = el.fills.filter(pred).map((f, i) => ({ ...f, id: 'f' + suffix + '_' + i }));
     const page = {
@@ -123,8 +126,8 @@ function splitPages(el, frameName) {
     page.sites = buildSiteMap(page);
     return page;
   };
-  const top = mk('A', 'Array', o => (o.y + (o.h || 0)) <= midY, borderTop);
-  const bottom = mk('B', 'CF/Cell', o => (o.y + (o.h || 0)) > midY, borderBottom);
+  const top = mk(sfx[0], 'Array', o => (o.y + (o.h || 0)) <= midY, borderTop);
+  const bottom = mk(sfx[1], 'CF/Cell', o => (o.y + (o.h || 0)) > midY, borderBottom);
   return [top, bottom];
 }
 
