@@ -17,7 +17,8 @@
     color: #7fd4ff;
     font-size: 40px;
     font-weight: 700;
-    letter-spacing: 4px;
+    letter-spacing: -0.02em; /* §15 大字号负 tracking */
+    line-height: 1.05;       /* §15 大字号紧 leading */
     text-align: center;
     margin-bottom: 8px;
   }
@@ -44,11 +45,27 @@
     cursor: pointer;
     text-decoration: none;
     transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease;
+    /* 加载时轻微 stagger 上浮淡入（§1 即时感；reduced-motion 下关闭） */
+    animation: menu-card-in .45s ease both;
+  }
+  .menu-card:nth-child(1) { animation-delay: 0ms; }
+  .menu-card:nth-child(2) { animation-delay: 60ms; }
+  .menu-card:nth-child(3) { animation-delay: 120ms; }
+  .menu-card:nth-child(4) { animation-delay: 180ms; }
+  @keyframes menu-card-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
   .menu-card:hover {
     border-color: #2f6ea5;
-    transform: translateY(-3px);
-    box-shadow: 0 6px 22px rgba(20, 60, 100, .5);
+    transform: translateY(-2px);              /* hover 上浮 2px */
+    box-shadow: 0 10px 28px rgba(20, 60, 100, .6); /* 阴影加深 */
+    will-change: transform;
+  }
+  /* §1/§10 即时反馈：按下即刻 scale(0.97)，100ms ease-out */
+  .menu-card:active {
+    transform: scale(0.97);
+    transition: transform 100ms ease-out;
   }
   .menu-card .mc-name { color: #7fd4ff; font-size: 21px; font-weight: 700; letter-spacing: 1px; }
   .menu-card .mc-desc { color: #8fb4d4; font-size: 14px; line-height: 1.6; flex: 1 1 auto; }
@@ -65,6 +82,16 @@
     border-radius: 3px;
     color: #ffd35f;
     font-size: 12px;
+  }
+  /* §14 reduced-motion：关 stagger 与位移，退化为 200ms 内淡入/静态 */
+  @media (prefers-reduced-motion: reduce) {
+    .menu-card { animation: none; transition: none; }
+    .menu-card:hover { transform: none; }
+    .menu-card:active { transform: none; }
+  }
+  /* §14 prefers-contrast:more：卡片加对比边框 */
+  @media (prefers-contrast: more) {
+    .menu-card { border: 2px solid #9fdcff; }
   }
 </style>
 </head>

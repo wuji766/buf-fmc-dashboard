@@ -105,9 +105,14 @@
       if (j === i) {
         g.removeAttribute('display');
         g.setAttribute('opacity', '0');
-        // 触发 CSS opacity 过渡（双重 rAF 确保初始 opacity=0 先完成布局）
+        // §7 空间一致：进入自下而上（+6px → 0），与 opacity 共用同一过渡曲线
+        g.style.transform = 'translateY(6px)';
+        // 触发 CSS opacity/transform 过渡（双重 rAF 确保初始状态先完成布局）
         requestAnimationFrame(function () {
-          requestAnimationFrame(function () { g.setAttribute('opacity', '1'); });
+          requestAnimationFrame(function () {
+            g.setAttribute('opacity', '1');
+            g.style.transform = 'translateY(0px)';
+          });
         });
       } else {
         g.setAttribute('display', 'none');

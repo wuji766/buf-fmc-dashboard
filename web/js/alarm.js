@@ -76,11 +76,15 @@
     return true;
   }
 
-  /* ---- 浏览器端：SVG 相机动画 ---- */
-  var animId = 0;
+  /* ---- 浏览器端：SVG 相机动画（motion.js spring，§4 damping 1.0 / response 0.4） ----
+   * spring 从当前展示值积分、可被用户缩放/拖拽输入随时打断（§3），
+   * 取代原 ease-in-out 固定时长插值（不可中途接管）。 */
+  var animSpring = null;
 
   /* 取消进行中的相机动画（用户手动缩放/拖拽时调用，防止动画回写覆盖） */
-  function cancelAnim() { animId++; }
+  function cancelAnim() {
+    if (animSpring) { animSpring.cancel(); animSpring = null; }
+  }
 
   function getViewBox(svg) {
     var v = (svg.getAttribute('viewBox') || '').trim().split(/[\s,]+/).map(Number);
@@ -89,23 +93,18 @@
 
   function animateViewBox(target, durationMs) {
     var svg = window.BUF.render && window.BUF.render.svgEl();
-    if (!svg) return;
-    var from = getViewBox(svg);
-    var to = target.slice();
-    var start = null;
-    var id = ++animId;
-    var dur = durationMs != null ? durationMs : 500;
-    function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
-    function frame(ts) {
-      if (id !== animId) return; // 已被新动画取代
-      if (start == null) start = ts;
-      var t = Math.min(1, (ts - start) / dur);
-      var e = ease(t);
-      var v = from.map(function (f, k) { return f + (to[k] - f) * e; });
-      svg.setAttribute('viewBox', v.map(function (n) { return Math.round(n * 100) / 100; }).join(' '));
-      if (t < 1) requestAnimationFrame(frame);
-    }
-    requestAnimationFrame(frame);
+    if (!svg || !window.BUF.motion) return;
+    cancelAnim(); // 新取景取代旧动画（从当前值继续，无跳变）
+    animSpring = window.BUF.motion.spring({
+      from: getViewBox(svg),
+      to: target.slice(),
+      damping: 1.0,
+      response: 0.4,
+      onUpdate: function (v) {
+        svg.setAttribute('viewBox', v.map(function (n) { return Math.round(n * 100) / 100; }).join(' '));
+      },
+      onSettle: function () { animSpring = null; }
+    });
   }
 
   function focus(pageIdx, viewBoxArr, durationMs) {

@@ -1,62 +1,91 @@
-/* BUF FMC 监控大屏骨架样式 */
+/* BUF FMC 监控大屏骨架样式（Apple Design 打磨版） */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { width: 100vw; height: 100vh; overflow: hidden; }
 body {
   background: #000;
   color: #cfe8ff;
-  font-family: 'Roboto Condensed', 'Noto Sans SC', sans-serif;
+  /* §15 排印：系统字体栈兜底，Noto Sans SC 在前 */
+  font-family: 'Noto Sans SC', 'Roboto Condensed', system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
   display: flex;
   flex-direction: column;
 }
 
-/* 页头 */
+/* ---- §12 材质与深度：半透明浮层 chrome ----
+ * 统一基材 rgba(18,24,34,0.62) + blur(20px) saturate(160%) + 顶部 1px 亮边；
+ * 材质权重编码层级：页头最重（更深 blur + 更重阴影），小控件最轻。 */
+
+/* 页头（重材质：结构层级最高） */
 #hud {
   flex: 0 0 44px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 18px;
-  background: linear-gradient(180deg, #0a1526, #06101c);
-  border-bottom: 1px solid #14304f;
+  background: rgba(18, 24, 34, 0.62);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  backdrop-filter: blur(28px) saturate(160%);
+  border-top: 1px solid rgba(255, 255, 255, 0.08); /* 亮边 = 光照在材质上 */
+  border-bottom: 1px solid rgba(20, 48, 79, 0.7);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);     /* 大表面 = 更深阴影 */
   font-size: 20px;
   letter-spacing: 1px;
+  position: relative;
+  z-index: 2;
 }
-#pageName { color: #7fd4ff; font-weight: 700; }
+/* §15 大字号标题：负 tracking + 紧 leading */
+#pageName { color: #7fd4ff; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
 #zoomHint { color: #4a6b8a; font-size: 13px; letter-spacing: 0; margin-left: 24px; }
 #clock { color: #9fb8cc; font-variant-numeric: tabular-nums; }
 #srcState.ok { color: #3fe08a; }
-#menuLink { color: #7fd4ff; font-size: 15px; text-decoration: none; border: 1px solid #14304f; border-radius: 4px; padding: 2px 12px; margin-left: 16px; }
-#menuLink:hover { border-color: #2f6ea5; background: #0a1526; }
 #srcState.err { color: #ff5f5f; }
+#menuLink {
+  color: #7fd4ff;
+  font-size: 15px;
+  text-decoration: none;
+  border: 1px solid #14304f;
+  border-radius: 4px;
+  padding: 2px 12px;
+  margin-left: 16px;
+}
+#menuLink:hover { border-color: #2f6ea5; background: rgba(47, 110, 165, 0.15); will-change: transform; }
+/* §1/§10 即时反馈：按下即刻 scale(0.97)，100ms ease-out */
+#menuLink:active { transform: scale(0.97); transition: transform 100ms ease-out; }
 
-/* 页头下状态条：实时摘要 + 轮播状态 */
+/* 页头下状态条（轻材质）：实时摘要 + 轮播状态 */
 #statusBar {
   flex: 0 0 28px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 18px;
-  background: #06101c;
-  border-bottom: 1px solid #14304f;
+  background: rgba(18, 24, 34, 0.62);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(20, 48, 79, 0.7);
   font-size: 15px;
   color: #8fb4d4;
+  font-variant-numeric: tabular-nums; /* §15 数字等宽，跳动不抖 */
+  position: relative;
+  z-index: 2;
 }
-#statusBar #lotSummary { font-variant-numeric: tabular-nums; }
 #statusBar #lotSummary .num { color: #7fd4ff; font-weight: 700; }
 #statusBar #lotSummary .num.alarm { color: #ff5f5f; }
 #statusBar #carouselState { color: #3fe08a; }
 #statusBar #carouselState.alarm { color: #ff8080; }
 #statusBar #carouselState.manual { color: #ffd35f; }
 
-/* 页脚图例条（报警条上方，无报警时贴底） */
+/* 页脚图例条（轻材质，与报警条同处 flex 流内、互不叠层） */
 #legend {
   flex: 0 0 30px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 34px;
-  background: #06101c;
-  border-top: 1px solid #14304f;
+  background: rgba(18, 24, 34, 0.62);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 14px;
   color: #8fb4d4;
 }
@@ -94,20 +123,26 @@ body {
 /* 主舞台 */
 #stage { flex: 1 1 auto; min-height: 0; display: flex; }
 #board { width: 100%; height: 100%; display: block; }
-#board .page { transition: opacity .6s ease; opacity: 1; }
+/* §7 页面切换：opacity + 6px y 位移共用同一过渡曲线（进入自下而上） */
+#board .page { transition: opacity .6s ease, transform .6s ease; opacity: 1; }
 
-/* 报警条（Task 3 启用） */
+/* 报警条（材质 + materialize 出现/消失：高度 + 透明度联动，不用 display:none） */
 #alarmBar {
-  flex: 0 0 40px;
+  flex: 0 0 auto;
+  height: 40px;
   overflow: hidden;
   white-space: nowrap;
-  background: #2a0b0b;
+  background: rgba(18, 24, 34, 0.62);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+  border-top: 1px solid rgba(255, 64, 64, 0.35); /* 红色语义放在描边/文字层，不放在材质底色 */
   color: #ff8080;
   line-height: 40px;
   font-size: 18px;
+  opacity: 1;
+  transition: height .35s ease, opacity .35s ease, border-top-width .35s ease;
 }
-#alarmBar.hidden { display: none; }
-#alarmBar { border-top: 1px solid #5a1414; }
+#alarmBar.hidden { height: 0; opacity: 0; border-top-width: 0; }
 /* rAF 驱动的滚动轨道：两份 .alarm-copy 并排，JS 按实测单份宽度取模循环 */
 #alarmBar .alarm-run {
   display: inline-flex;
@@ -117,7 +152,7 @@ body {
 #alarmBar .alarm-copy { display: inline-block; white-space: nowrap; }
 #alarmBar .alarm-sep { color: #a33; }
 
-/* 站点报警红描边脉冲（Task 5） */
+/* 站点报警红描边脉冲（保留） */
 .alarm-pulse {
   animation: alarm-stroke 2s ease-in-out infinite;
 }
@@ -126,7 +161,7 @@ body {
   50%      { stroke: #ff7070; stroke-width: 6; }
 }
 
-/* 右下角页码指示器：带页名的按钮组 */
+/* 右下角页码指示器（最轻材质：小控件 = 轻 blur、轻底色） */
 #pager {
   position: fixed;
   right: 18px;
@@ -138,16 +173,50 @@ body {
   padding: 5px 12px;
   border: 1px solid #3f6f9f;
   border-radius: 4px;
-  background: rgba(6, 16, 28, 0.82);
+  background: rgba(18, 24, 34, 0.5);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: blur(12px) saturate(160%);
   color: #8fb4d4;
-  font: 14px 'Roboto Condensed', 'Noto Sans SC', sans-serif;
+  font: 14px 'Noto Sans SC', 'Roboto Condensed', system-ui, sans-serif;
   letter-spacing: 0.5px;
   cursor: pointer;
 }
-#pager .pgBtn:hover { border-color: #7fd4ff; color: #cfe8ff; }
+#pager .pgBtn:hover { border-color: #7fd4ff; color: #cfe8ff; will-change: transform; }
+/* §1/§10 即时反馈：按下即刻 scale(0.97) */
+#pager .pgBtn:active { transform: scale(0.97); transition: transform 100ms ease-out; }
 #pager .pgBtn.on {
   background: #7fd4ff;
   border-color: #7fd4ff;
   color: #06101c;
   font-weight: 700;
+}
+
+/* ---- §14 可访问性 ---- */
+
+/* reduced-motion：全部动效退化为 ≤200ms opacity cross-fade 或静态 */
+@media (prefers-reduced-motion: reduce) {
+  #board .page { transition: opacity 200ms ease; transform: none !important; }
+  #alarmBar { transition: opacity 200ms ease; }
+  #menuLink, #pager .pgBtn { transition: none; }
+  #menuLink:active, #pager .pgBtn:active { transform: none; }
+  .alarm-pulse { animation: none; stroke: #ff2020; stroke-width: 3; } /* 静态红框 */
+  #legend .sw-alarm { animation: none; border-color: #ff2020; border-width: 2px; }
+}
+
+/* reduced-transparency：材质变实底、去 blur */
+@media (prefers-reduced-transparency: reduce) {
+  #hud, #statusBar, #legend, #alarmBar {
+    background: #121a26;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  #pager .pgBtn { background: #121a26; -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+/* prefers-contrast:more：控件加对比边框 */
+@media (prefers-contrast: more) {
+  #menuLink, #pager .pgBtn { border: 2px solid #9fdcff; }
+  #hud, #statusBar { border-bottom-color: #9fdcff; }
+  #legend { border-top-color: #9fdcff; }
+  #alarmBar { border-top-color: #ff6060; }
 }
