@@ -16,21 +16,33 @@
     return { x: t.x, y: t.y, w: t.w, h: t.h };
   }
 
-  /* 元素墨迹盒 → 根 svg 用户坐标 AABB */
+  /* 元素墨迹盒 → 根 svg 用户坐标 AABB
+   * 用 canvas measureText（真实字体度量）+ 元素 CTM 定位换算。
+   * 实测 Chrome 对 <text> 的 getBBox/getBoundingClientRect 在 webfont 就绪后
+   * 存在过期/虚高（单字符可虚高 40%+），不可作为验收依据；
+   * canvas 度量与渲染同源（同一字体），是可复现的真值。 */
   function userAABB(svg, el) {
-    var m = el.getScreenCTM();
-    if (!m) return null;
-    var root = svg.getScreenCTM();
-    if (!root) return null;
-    var toRoot = root.inverse().multiply(m); // local→screen→root-user
-    var pt = svg.createSVGPoint(), bb = el.getBBox();
-    var xs = [], ys = [];
-    [[bb.x, bb.y], [bb.x + bb.width, bb.y], [bb.x, bb.y + bb.height], [bb.x + bb.width, bb.y + bb.height]]
-      .forEach(function (c) {
-        pt.x = c[0]; pt.y = c[1];
-        var q = pt.matrixTransform(toRoot);
-        xs.push(q.x); ys.push(q.y);
-      });
+    var m = el.getScreenCTM(), root = svg.getScreenCTM();
+    if (!m || !root) return null;
+    var toRoot = root.inverse().multiply(m);
+    var cs = getComputedStyle(el);
+    var ctx = userAABB._ctx || (userAABB._ctx = document.createElement('canvas').getContext('2d'));
+    ctx.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+    var mt = ctx.measureText(el.textContent || ' ');
+    var W = mt.width, sz = parseFloat(cs.fontSize);
+    var asc = mt.fontBoundingBoxAscent != null ? mt.fontBoundingBoxAscent : sz * 0.9;
+    var desc = mt.fontBoundingBoxDescent != null ? mt.fontBoundingBoxDescent : sz * 0.3;
+    // 锚点：text-anchor 决定 x 方向伸展；dominant-baseline central → 垂直中心=0，否则基线=0
+    var x0 = cs.textAnchor === 'end' ? -W : cs.textAnchor === 'middle' ? -W / 2 : 0;
+    var y0, y1;
+    if (cs.dominantBaseline === 'central') { y0 = -(asc + desc) / 2; y1 = (asc + desc) / 2; }
+    else { y0 = -asc; y1 = desc; }
+    var pt = svg.createSVGPoint(), xs = [], ys = [];
+    [[x0, y0], [x0 + W, y0], [x0, y1], [x0 + W, y1]].forEach(function (c) {
+      pt.x = c[0]; pt.y = c[1];
+      var q = pt.matrixTransform(toRoot);
+      xs.push(q.x); ys.push(q.y);
+    });
     return { x: Math.min.apply(null, xs), y: Math.min.apply(null, ys),
              X: Math.max.apply(null, xs), Y: Math.max.apply(null, ys),
              w: Math.max.apply(null, xs) - Math.min.apply(null, xs),

@@ -10,6 +10,18 @@ const FONT = 'Noto Sans SC';
 const isAscii = s => { for (const ch of s) if (ch.charCodeAt(0) > 0x2e80) return false; return true; };
 // 纯 ASCII 标签用窄字体（贴近 Excel 宋体半角观感），否则 Noto Sans SC 下会溢出/换行
 const fontOf = content => isAscii(content) ? 'Roboto Condensed' : FONT;
+
+/* ---- 字符宽度表（浏览器 canvas measureText 实测，单位 em，2026-08-31）----
+ * shrink-to-fit 的估宽必须与真实渲染一致：RC=Roboto Condensed 常规/加粗，NOTO=Noto Sans SC 拉丁。
+ * 未收录字符回退：RC 0.55 / NOTO 0.62；CJK 全部 1.0em。 */
+const RC_W = { '0':0.494,'1':0.494,'2':0.494,'3':0.494,'4':0.494,'5':0.494,'6':0.494,'7':0.494,'8':0.494,'9':0.494,' ':0.229,'!':0.246,'"':0.32,'#':0.548,'$':0.494,'%':0.633,'&':0.544,"'":0.175,'(':0.314,')':0.319,'*':0.431,'+':0.497,',':0.197,'-':0.248,'.':0.264,'/':0.371,':':0.233,';':0.203,'<':0.446,'=':0.479,'>':0.46,'?':0.422,'@':0.769,'A':0.577,'B':0.546,'C':0.567,'D':0.571,'E':0.497,'F':0.481,'G':0.591,'H':0.62,'I':0.25,'J':0.483,'K':0.545,'L':0.476,'M':0.755,'N':0.62,'O':0.601,'P':0.554,'Q':0.601,'R':0.531,'S':0.519,'T':0.521,'U':0.562,'V':0.561,'W':0.762,'X':0.551,'Y':0.525,'Z':0.523,'[':0.25,'\\':0.37,']':0.25,'^':0.371,'_':0.405,'`':0.309,'a':0.479,'b':0.493,'c':0.462,'d':0.496,'e':0.469,'f':0.316,'g':0.493,'h':0.483,'i':0.229,'j':0.224,'k':0.451,'l':0.229,'m':0.753,'n':0.484,'o':0.502,'p':0.493,'q':0.5,'r':0.305,'s':0.456,'t':0.296,'u':0.483,'v':0.428,'w':0.65,'x':0.439,'y':0.417,'z':0.439,'{':0.307,'|':0.244,'}':0.307,'~':0.589 };
+const RC_B = { '0':0.505,'1':0.505,'2':0.505,'3':0.505,'4':0.505,'5':0.505,'6':0.505,'7':0.505,'8':0.505,'9':0.505,' ':0.23,'!':0.261,'"':0.321,'#':0.528,'$':0.505,'%':0.638,'&':0.579,"'":0.162,'(':0.323,')':0.324,'*':0.454,'+':0.476,',':0.245,'-':0.361,'.':0.291,'/':0.332,':':0.273,';':0.253,'<':0.447,'=':0.503,'>':0.454,'?':0.447,'@':0.766,'A':0.597,'B':0.561,'C':0.57,'D':0.565,'E':0.491,'F':0.476,'G':0.585,'H':0.614,'I':0.27,'J':0.49,'K':0.553,'L':0.479,'M':0.758,'N':0.612,'O':0.604,'P':0.568,'Q':0.604,'R':0.553,'S':0.54,'T':0.542,'U':0.571,'V':0.578,'W':0.75,'X':0.56,'Y':0.542,'Z':0.53,'[':0.264,'\\':0.381,']':0.264,'^':0.391,'_':0.4,'`':0.331,'a':0.471,'b':0.495,'c':0.46,'d':0.496,'e':0.479,'f':0.328,'g':0.503,'h':0.492,'i':0.252,'j':0.245,'k':0.478,'l':0.252,'m':0.742,'n':0.492,'o':0.498,'p':0.495,'q':0.497,'r':0.331,'s':0.454,'t':0.307,'u':0.492,'v':0.449,'w':0.633,'x':0.452,'y':0.445,'z':0.452,'{':0.298,'|':0.253,'}':0.298,'~':0.558 };
+const NOTO_W = { '0':0.555,'1':0.555,'2':0.555,'3':0.555,'4':0.555,'5':0.555,'6':0.555,'7':0.555,'8':0.555,'9':0.555,' ':0.224,'!':0.323,'"':0.475,'#':0.555,'$':0.555,'%':0.921,'&':0.68,"'":0.279,'(':0.338,')':0.338,'*':0.467,'+':0.555,',':0.278,'-':0.347,'.':0.278,'/':0.392,':':0.278,';':0.278,'<':0.555,'=':0.555,'>':0.555,'?':0.474,'@':0.946,'A':0.608,'B':0.657,'C':0.638,'D':0.688,'E':0.589,'F':0.552,'G':0.689,'H':0.728,'I':0.293,'J':0.535,'K':0.646,'L':0.543,'M':0.812,'N':0.723,'O':0.742,'P':0.633,'Q':0.742,'R':0.635,'S':0.596,'T':0.599,'U':0.721,'V':0.575,'W':0.878,'X':0.573,'Y':0.531,'Z':0.603,'[':0.338,'\\':0.392,']':0.338,'^':0.555,'_':0.559,'a':0.563,'b':0.618,'c':0.51,'d':0.62,'e':0.554,'f':0.325,'g':0.564,'h':0.607,'i':0.275,'j':0.275,'k':0.552,'l':0.284,'m':0.926,'n':0.61,'o':0.606,'p':0.62,'q':0.62,'r':0.388,'s':0.468,'t':0.377,'u':0.607,'v':0.521,'w':0.802,'x':0.498,'y':0.521,'z':0.475,'{':0.338,'|':0.27,'}':0.338,'~':0.555 };
+function charW(ch, bold, font) {
+  if (ch.charCodeAt(0) > 0x2e80) return 1.0;
+  if (font === 'Roboto Condensed') return (bold ? RC_B : RC_W)[ch] || 0.55;
+  return NOTO_W[ch] || 0.62;
+}
 const decodeEnt = s => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&#39;/g, "'").replace(/&amp;/g, '&');
 
 function attrStr(tag) { // tag = attrs string
@@ -146,32 +158,74 @@ function build(sheet, shapesFor) {
     const valign = (st.v ? st.v.toLowerCase() : 'bottom');
     let content = cell.v;
     if (cell.vt === 'Number') { const n = +content; content = String(n); }
-    // 估宽：ASCII≈0.62em，CJK≈1em，加粗+5%
-    const emW = isAscii(content) ? 0.55 : 0.62; // 保守估宽：防换行即可（盒不裁剪文字，溢出与 Excel 一致）
-    let est = 0; for (const ch of content) est += (ch.charCodeAt(0) > 0x2e80 ? 1.0 : emW) * st.size;
-    if (st.bold) est *= 1.05;
+    // 估宽：按实测字符宽度表（与浏览器 canvas measureText 同源），CJK=1em
+    const font = fontOf(content);
+    const estOf = (sz) => {
+      let e = 0; for (const ch of content) e += charW(ch, st.bold, font) * sz;
+      return e;
+    };
     // pencil 实测（rot-test 实验，ctx.bounds 验证）：
     //   rotation:90  渲染矩形 = (x, y-w, h, w)，自下而上读
     //   rotation:270 渲染矩形 = (x-h, y, h, w)，自上而下读
     // Excel Rotate=90 为自下而上 → pencil 90；Rotate=-90 自上而下 → pencil 270
+    // 有效区域：合并区内若存在**带值的被覆盖格**（如 KHM-31CL 两行合并、下半行还有数字 1-4），
+    // 两者都会渲染——标签必须限制在未被占用行列里，否则与覆盖格文字重叠。
+    let ex0 = bx, ey0 = by, ex1 = bx + bw, ey1 = by + bh, reduced = false;
+    if (cell.ma || cell.md) {
+      const occR = new Set(), occC = new Set();
+      for (const cc of cells) {
+        if (cc === cell || cc.v == null || cc.v === '') continue;
+        if (cc.r >= cell.r && cc.r <= r1 && cc.c >= cell.c && cc.c <= c1) {
+          for (let dr = 0; dr <= cc.md; dr++) occR.add(cc.r + dr);
+          for (let dc = 0; dc <= cc.ma; dc++) occC.add(cc.c + dc);
+        }
+      }
+      if (occR.size || occC.size) {
+        const freeR = []; for (let r = cell.r; r <= r1; r++) if (!occR.has(r)) freeR.push(r);
+        const freeC = []; for (let c = cell.c; c <= c1; c++) if (!occC.has(c)) freeC.push(c);
+        if (freeR.length && freeR.length < r1 - cell.r + 1) { ey0 = ys[freeR[0]]; ey1 = ys[freeR[freeR.length - 1] + 1]; reduced = true; }
+        if (freeC.length && freeC.length < c1 - cell.c + 1) { ex0 = xs[freeC[0]]; ex1 = xs[freeC[freeC.length - 1] + 1]; reduced = true; }
+      }
+    }
+    const effW = ex1 - ex0, effH = ey1 - ey0;
+    // Shrink-to-fit：文字必须被其所属单元格（有效区域）容纳——水平看 effW，旋转看 effH；
+    // 估宽超出则缩字号（下限 6pt，到下限仍溢出则接受），不再扩盒（扩盒=溢出源头）。
+    const hFactor = font === 'Roboto Condensed' ? 1.35 : 1.5;
     let x = bx, y = by, w = bw, h = bh, rot = 0, fsize = st.size;
     if (st.rotate === 90 || st.rotate === -90) {
-      // 盒长 ≥ 估长防换行；与单元格居中对齐（文字实际长度不足盒长时居中显示）
-      w = +Math.max(bh, est + 1).toFixed(2);
-      if (st.rotate === 90) { rot = 90; h = bw; x = bx; y = +(by + (bh + w) / 2).toFixed(2); }
-      else { rot = 270; h = bw; x = bx + bw; y = +(by + (bh - w) / 2).toFixed(2); }
-    } else {
-      if (est > bw) { // 防换行溢出：按对齐方向扩宽
-        const need = +(est + 2).toFixed(2), extra = need - bw;
-        w = need;
-        if (align === 'right') x -= extra;
-        else if (align === 'center') x = +(x - extra / 2).toFixed(2);
+      const avail = effH;
+      let est = estOf(fsize);
+      if (est > avail) {
+        fsize = Math.max(6, Math.floor(st.size * avail / est * 10) / 10);
+        est = estOf(fsize);
       }
-      h = bh + 2; y = +(by - 1).toFixed(2); // 垂直余量
+      // 厚度方向同样 shrink-to-fit（合并区被压缩时，厚度不得超过有效列宽）
+      if (reduced && fsize * hFactor > effW) fsize = Math.max(6, Math.floor(effW / hFactor * 10) / 10);
+      // 盒：阅读向长度 w=est+1，厚度 h=字号×1.35(RC)/1.5(Noto)，均在有效区域内居中
+      w = +(est + 1).toFixed(2);
+      h = +(fsize * hFactor).toFixed(2);
+      if (st.rotate === 90) { rot = 90; x = +(ex0 + (effW - h) / 2).toFixed(2); y = +(ey0 + (effH + w) / 2).toFixed(2); }
+      else { rot = 270; x = +(ex0 + (effW + h) / 2).toFixed(2); y = +(ey0 + (effH - w) / 2).toFixed(2); }
+    } else {
+      const avail = effW;
+      let est = estOf(fsize);
+      if (est > avail) {
+        fsize = Math.max(6, Math.floor(st.size * avail / est * 10) / 10);
+        est = estOf(fsize);
+      }
+      // 垂直 shrink-to-fit：合并区被压缩时，盒高不得超过有效行高（防与覆盖格文字 em 盒相压）
+      if (reduced && fsize * hFactor > effH) fsize = Math.max(6, Math.floor(effH / hFactor * 10) / 10);
+      // 盒收紧：w=est+1、h=字号×1.35(RC)/1.5(Noto)；水平按对齐、垂直在有效区域内居中
+      w = +(est + 1).toFixed(2);
+      h = +(fsize * hFactor).toFixed(2);
+      if (align === 'center') x = +(ex0 + (effW - w) / 2).toFixed(2);
+      else if (align === 'right') x = +(ex0 + effW - w).toFixed(2);
+      else x = ex0;
+      y = +(ey0 + (effH - h) / 2).toFixed(2);
     }
     texts.push({
       content, x: +x.toFixed(2), y: +y.toFixed(2), w: +w.toFixed(2), h: +h.toFixed(2),
-      size: fsize, bold: st.bold, rot, align, font: fontOf(content), valign: rot ? 'middle' : valign, color: st.color,
+      size: fsize, bold: st.bold, rot, align, font: fontOf(content), valign: 'middle', color: st.color,
       name: ('txt:' + content).slice(0, 30)
     });
   }
