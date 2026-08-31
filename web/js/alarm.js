@@ -132,31 +132,55 @@
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
+  /* rAF 驱动的 marquee：内容复制两份放在同一轨道 .alarm-run 内，循环长度用第一份
+   * .alarm-copy 的实测 offsetWidth；报警列表每次变化都重建内容→重新测量→从头滚动，
+   * 保证文字与滚动位置严格对应（不出现 CSS 动画旧进度套新内容的跳变/接缝错位）。 */
+  var barRafId = 0;
+
+  function stopBarScroll() {
+    if (barRafId) { cancelAnimationFrame(barRafId); barRafId = 0; }
+  }
+
+  function startBarScroll(el) {
+    stopBarScroll();
+    var copy = el.querySelector('.alarm-copy');
+    var track = el.querySelector('.alarm-run');
+    if (!copy || !track) return;
+    var loopW = copy.offsetWidth; // 单份内容实测宽度 = 循环长度
+    if (!loopW) { // 尚未布局完成，下一帧再测
+      barRafId = requestAnimationFrame(function () { barRafId = 0; startBarScroll(el); });
+      return;
+    }
+    var phase = 0; // 从头开始（相位归零，内容左端与容器左端对齐）
+    var last = null;
+    function frame(ts) {
+      if (last == null) last = ts;
+      phase += NS_SPEED * (ts - last) / 1000; // 向左匀速
+      last = ts;
+      if (phase >= loopW) phase -= loopW; // 单份宽度取模 → 无缝循环
+      track.style.transform = 'translateX(' + (-Math.round(phase)) + 'px)';
+      barRafId = requestAnimationFrame(frame);
+    }
+    barRafId = requestAnimationFrame(frame);
+  }
+
   function bar(alarms) {
     var el = document.getElementById('alarmBar');
     if (!el) return;
     alarms = (alarms || []).filter(function (a) { return a.active !== false; });
-    if (!alarms.length) { el.className = 'hidden'; el.textContent = ''; return; }
+    if (!alarms.length) { stopBarScroll(); el.className = 'hidden'; el.innerHTML = ''; return; }
     var sorted = alarms.slice().sort(function (a, b) { return b.ts - a.ts; });
     var items = sorted.map(function (a) {
       var parts = [hhmmss(a.ts), a.pageName || a.pageId || '', a.siteId || '', a.code || '', a.text || ''];
       var s = parts.map(escapeHtml).join(' | ').replace(/\s+\|/g, ' |').replace(/\|\s+/g, '| ');
       return '<span class="alarm-item">' + s + '</span>';
     });
-    var content = items.join('<span class="alarm-sep">　◆　</span>');
+    var content = items.join('<span class="alarm-sep">　◆　</span>') + '<span class="alarm-sep">　◆　</span>';
     el.className = '';
-    el.innerHTML = '<div class="alarm-track"><span class="alarm-run">' + content +
-      '<span class="alarm-sep">　◆　</span></span><span class="alarm-run" aria-hidden="true">' + content +
-      '<span class="alarm-sep">　◆　</span></span></div>';
-    /* 时长按内容宽自适应（内容宽/速度），两份内容各占一半 → 用第一份宽计算 */
-    requestAnimationFrame(function () {
-      var run = el.querySelector('.alarm-run');
-      if (!run) return;
-      var dur = Math.max(10, Math.round(run.scrollWidth / NS_SPEED));
-      el.querySelectorAll('.alarm-run').forEach(function (r) {
-        r.style.animationDuration = dur + 's';
-      });
-    });
+    /* 单一轨道 .alarm-run 内两份内容（第二份 aria-hidden），rAF 按实测单份宽度循环 */
+    el.innerHTML = '<div class="alarm-run"><span class="alarm-copy">' + content + '</span>' +
+      '<span class="alarm-copy" aria-hidden="true">' + content + '</span></div>';
+    startBarScroll(el);
   }
 
   if (typeof window !== 'undefined') {

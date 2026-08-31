@@ -61,7 +61,7 @@
 
 ### 运行方式
 - 测试：项目根目录运行 `node --test`（全部单测）。
-- 双击 `web/index.html` 即可运行（免构建、免服务器，数据为 mock 引擎）。建议用 Chrome/Edge。
+- 打开 `web/menu.html` 选择运行模式（正常监控 / 报警演示 / 快速轮播 / QA 质检，卡片点击进入；免构建、免服务器，数据为 mock 引擎）。也可直接双击 `web/index.html` 进入正常监控模式。建议用 Chrome/Edge。
 - 演示参数（可选 URL 参数加速演示）：
   - `index.html?alarmRate=1&dwell=180000` —— 报警高频触发（每 tick 必出）且持续仅 20s，dwell 取最小 3 分钟，便于快速观察报警锁定/轮播/恢复全流程。
   - `index.html?alarmRate=0` —— 关闭报警，静观 lot 迁移与容量刷新。

@@ -25,6 +25,8 @@ body {
 #zoomHint { color: #4a6b8a; font-size: 13px; letter-spacing: 0; margin-left: 24px; }
 #clock { color: #9fb8cc; font-variant-numeric: tabular-nums; }
 #srcState.ok { color: #3fe08a; }
+#menuLink { color: #7fd4ff; font-size: 15px; text-decoration: none; border: 1px solid #14304f; border-radius: 4px; padding: 2px 12px; margin-left: 16px; }
+#menuLink:hover { border-color: #2f6ea5; background: #0a1526; }
 #srcState.err { color: #ff5f5f; }
 
 /* 页头下状态条：实时摘要 + 轮播状态 */
@@ -106,20 +108,13 @@ body {
 }
 #alarmBar.hidden { display: none; }
 #alarmBar { border-top: 1px solid #5a1414; }
-#alarmBar .alarm-track {
+/* rAF 驱动的滚动轨道：两份 .alarm-copy 并排，JS 按实测单份宽度取模循环 */
+#alarmBar .alarm-run {
   display: inline-flex;
   white-space: nowrap;
-  min-width: 100%;
+  will-change: transform;
 }
-#alarmBar .alarm-run {
-  display: inline-block;
-  white-space: nowrap;
-  animation: alarm-marquee linear infinite;
-}
-@keyframes alarm-marquee {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-100%); }
-}
+#alarmBar .alarm-copy { display: inline-block; white-space: nowrap; }
 #alarmBar .alarm-sep { color: #a33; }
 
 /* 站点报警红描边脉冲（Task 5） */

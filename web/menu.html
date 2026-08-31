@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>BUF FMC 监控大屏 · 模式选择</title>
+<link rel="stylesheet" href="css/dashboard.css">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  body.menu-page {
+    display: block;
+    overflow: auto;
+    background: radial-gradient(1200px 600px at 50% -10%, #0a1526, #04080f 70%);
+    padding: 48px 6vw;
+  }
+  .menu-wrap { max-width: 1100px; margin: 0 auto; }
+  .menu-title {
+    color: #7fd4ff;
+    font-size: 40px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  .menu-sub {
+    color: #4a6b8a;
+    font-size: 15px;
+    text-align: center;
+    letter-spacing: 2px;
+    margin-bottom: 40px;
+  }
+  .menu-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 22px;
+  }
+  .menu-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 22px 24px;
+    background: linear-gradient(180deg, #0a1526, #06101c);
+    border: 1px solid #14304f;
+    border-radius: 8px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease;
+  }
+  .menu-card:hover {
+    border-color: #2f6ea5;
+    transform: translateY(-3px);
+    box-shadow: 0 6px 22px rgba(20, 60, 100, .5);
+  }
+  .menu-card .mc-name { color: #7fd4ff; font-size: 21px; font-weight: 700; letter-spacing: 1px; }
+  .menu-card .mc-desc { color: #8fb4d4; font-size: 14px; line-height: 1.6; flex: 1 1 auto; }
+  .menu-card .mc-url {
+    color: #4a6b8a;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    word-break: break-all;
+  }
+  .menu-card .mc-tag {
+    align-self: flex-start;
+    padding: 1px 8px;
+    border: 1px solid #ffd35f;
+    border-radius: 3px;
+    color: #ffd35f;
+    font-size: 12px;
+  }
+</style>
+</head>
+<body class="menu-page">
+<div class="menu-wrap">
+  <div class="menu-title">BUF FMC 监控大屏</div>
+  <div class="menu-sub">选择运行模式</div>
+  <div class="menu-grid">
+    <a class="menu-card" href="index.html">
+      <span class="mc-name">正常监控模式</span>
+      <span class="mc-desc">默认模式：5 分钟自动轮播全部页面，使用 mock 数据模拟在厂状态与随机报警。</span>
+      <span class="mc-url">index.html</span>
+    </a>
+    <a class="menu-card" href="index.html?alarmRate=1">
+      <span class="mc-name">报警演示模式</span>
+      <span class="mc-desc">高概率触发报警，便于验收报警锁定、包络特写/巡航与底部报警信息条。</span>
+      <span class="mc-url">index.html?alarmRate=1</span>
+    </a>
+    <a class="menu-card" href="index.html?dwell=180000&amp;alarmRate=1">
+      <span class="mc-name">快速轮播模式</span>
+      <span class="mc-desc">3 分钟轮播 + 报警演示：换页更频繁，适合快速观察跨页报警切换。</span>
+      <span class="mc-url">index.html?dwell=180000&amp;alarmRate=1</span>
+    </a>
+    <a class="menu-card" href="index.html?qa=1">
+      <span class="mc-name">质检模式（QA）</span>
+      <span class="mc-tag">开发用</span>
+      <span class="mc-desc">渲染核验模式：不自动轮播，用于逐页检查渲染正确性。</span>
+      <span class="mc-url">index.html?qa=1</span>
+    </a>
+  </div>
+</div>
+</body>
+</html>
