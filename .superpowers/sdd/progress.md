@@ -15,3 +15,4 @@ Feedback round 4: complete (28666e7 web/data + pen sync 857/857+822/822+Copy L20
 Feedback round 5: complete (320cdf2) - menu.html 模式索引页 + rAF 报警条滚动同步(CDP实测50s/21采样通过); 控制者注: 本轮控制会话曾陷入空转故障已终止
 Apple Design polish: complete (ac986a4 + 4de6d23, tests 27/27, CDP browser QA 29/29) - springs/gestures/materials/typography/a11y; 前一实现者限额中断由新代理接续
 Publish: main+gh-pages pushed to github.com/wuji766/buf-fmc-dashboard, Pages live at https://wuji766.github.io/buf-fmc-dashboard/menu.html; dwell configurable (6f58b5f)
+Dwell options v2: 1min/30s/15s/5s (c51f8b9 main + 686e819 gh-pages, online verified)
