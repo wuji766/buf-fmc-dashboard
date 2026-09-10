@@ -3,8 +3,10 @@
   var CFG = window.BUF_CONFIG || {};
   function cfg(name, def) { return CFG[name] != null ? CFG[name] : def; }
   var DWELL = cfg('dwell', 60000);        // 自动换页间隔（config.js 可调）
-  var MIN_DWELL = cfg('minDwell', 5000);
-  var MAX_DWELL = cfg('maxDwell', 600000);
+  // URL dwell 钳制用硬编码安全界（1s~1h），不读 config——避免 CDN/浏览器缓存的旧配置
+  // 把菜单传入的短时长（如 5s）错误钳回旧下限
+  var MIN_DWELL = 1000;
+  var MAX_DWELL = 3600000;
   var MANUAL_HOLD = cfg('manualRecovery', 60000);
   var CRUISE_INTERVAL = cfg('cruiseInterval', 20000);
   var DATA_INTERVAL = 2000;               // 数据刷新间隔 2s
