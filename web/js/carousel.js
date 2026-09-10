@@ -64,6 +64,14 @@
       return page;
     }
 
+    /* 运行中动态改 dwell（立即生效）：从当前页开始时刻起按新 dwell 计算，
+     * 即若当前页已过时长超过新 dwell，下次 tick 立即切页；本身不触发切页。
+     * 非法值（0/负/非数）忽略，保持原 dwell。 */
+    function setDwell(ms) {
+      if (isFinite(ms) && ms > 0) dwell = ms;
+      return dwell;
+    }
+
     function activeAlarms(alarms) {
       alarms = alarms || [];
       var t = now();
@@ -93,8 +101,10 @@
       manual: manual,
       activeAlarms: activeAlarms,
       currentPage: currentPage,
+      setDwell: setDwell,
       /* 状态查询（供页头状态条显示） */
       mode: function () { return mode; },
+      dwell: function () { return dwell; },
       pageStartTs: function () { return pageStartTs; },
       manualUntil: function () { return manualUntil; },
       alarmPageCount: function () { return alarmPages.length; },

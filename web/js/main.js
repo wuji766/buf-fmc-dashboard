@@ -24,8 +24,23 @@
     document.body.appendChild(s);
     return;
   }
-  if (qs.dwell != null && isFinite(+qs.dwell)) {
-    DWELL = Math.max(MIN_DWELL, Math.min(MAX_DWELL, +qs.dwell));
+  /* dwell 解析（优先级：URL ?dwell= > localStorage(buf.dwell) > config.dwell）
+   * - URL 值钳到 [minDwell,maxDwell]；显式指定时把该值写入 localStorage；
+   *   0/负/非数视为未指定（防护：绝不采用非法值，落到下一级）
+   * - localStorage 非法值同样不采用（保持 config.dwell=300000 兜底）
+   * - 页头胶囊选项（1-10 分钟整）直接给定值，不做 min/max 钳制 */
+  var DWELL_KEY = 'buf.dwell';
+  var urlDwell = null;
+  if (qs.dwell != null && isFinite(+qs.dwell) && +qs.dwell > 0) {
+    urlDwell = Math.max(MIN_DWELL, Math.min(MAX_DWELL, +qs.dwell));
+  }
+  if (urlDwell != null) {
+    DWELL = urlDwell;
+    try { localStorage.setItem(DWELL_KEY, String(urlDwell)); } catch (e) {}
+  } else {
+    var savedDwell = null;
+    try { savedDwell = localStorage.getItem(DWELL_KEY); } catch (e) {}
+    if (savedDwell != null && isFinite(+savedDwell) && +savedDwell > 0) DWELL = +savedDwell;
   }
   var mockOpts = { pages: window.BUF_PAGES };
   if (qs.alarmRate != null && isFinite(+qs.alarmRate)) {
@@ -90,6 +105,56 @@
   });
   buildPager(function (i) { carousel.manual(i); });
   syncPager();
+
+  /* 页头停留时长设置胶囊（?qa=1 时 main.js 已早退，本控件不渲染）
+   * 选项固定分钟数，选择后立即生效并持久化到 localStorage(buf.dwell) */
+  var DWELL_OPTIONS = [1, 2, 3, 4, 5, 6, 8, 10]; // 分钟
+  function dwellLabel(ms) {
+    var m = ms / 60000;
+    return '轮播 ' + (m % 1 === 0 ? m : m.toFixed(1)) + ' 分钟';
+  }
+  function buildDwellCtl() {
+    var slot = document.getElementById('dwellSlot');
+    if (!slot) return;
+    var ctl = document.createElement('div');
+    ctl.className = 'dwell-ctl';
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dwell-btn';
+    btn.title = '设置自动轮播每页停留时长';
+    btn.textContent = dwellLabel(DWELL);
+    var pop = document.createElement('div');
+    pop.className = 'dwell-menu hidden';
+    DWELL_OPTIONS.forEach(function (m) {
+      var ob = document.createElement('button');
+      ob.type = 'button';
+      ob.className = 'dwell-opt' + (m * 60000 === DWELL ? ' on' : '');
+      ob.textContent = m + ' 分钟';
+      ob.onclick = function (ev) {
+        ev.stopPropagation();
+        DWELL = m * 60000;
+        carousel.setDwell(DWELL);          // 立即生效：当前页开始时刻起按新时长
+        try { localStorage.setItem(DWELL_KEY, String(DWELL)); } catch (e) {}
+        btn.textContent = dwellLabel(DWELL);
+        var opts = pop.querySelectorAll('.dwell-opt');
+        for (var k = 0; k < opts.length; k++) {
+          opts[k].className = 'dwell-opt' + (opts[k] === ob ? ' on' : '');
+        }
+        pop.classList.add('hidden');
+        renderCarouselState();             // 状态条倒计时立即按新值显示
+      };
+      pop.appendChild(ob);
+    });
+    btn.onclick = function (ev) {
+      ev.stopPropagation();
+      pop.classList.toggle('hidden');
+    };
+    document.addEventListener('click', function () { pop.classList.add('hidden'); });
+    ctl.appendChild(btn);
+    ctl.appendChild(pop);
+    slot.appendChild(ctl);
+  }
+  buildDwellCtl();
 
   /* 装配：数据引擎（mock provider） */
   var idToIdx = {};

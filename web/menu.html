@@ -83,6 +83,26 @@
     color: #ffd35f;
     font-size: 12px;
   }
+  /* 停留时长选择行（三张非 QA 卡片共享同一持久化偏好 buf.dwell） */
+  .mc-dwell-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed #14304f;
+  }
+  .mc-dwell-lbl { color: #4a6b8a; font-size: 12px; letter-spacing: 1px; }
+  .mc-dwell {
+    background: rgba(18, 24, 34, 0.9);
+    color: #cfe8ff;
+    border: 1px solid #14304f;
+    border-radius: 4px;
+    padding: 3px 10px;
+    font: 13px 'Noto Sans SC', 'Roboto Condensed', system-ui, sans-serif;
+    cursor: pointer;
+  }
+  .mc-dwell:hover { border-color: #2f6ea5; }
+  .mc-dwell:focus { outline: 1px solid #7fd4ff; }
   /* §14 reduced-motion：关 stagger 与位移，退化为 200ms 内淡入/静态 */
   @media (prefers-reduced-motion: reduce) {
     .menu-card { animation: none; transition: none; }
@@ -100,20 +120,47 @@
   <div class="menu-title">BUF FMC 监控大屏</div>
   <div class="menu-sub">选择运行模式</div>
   <div class="menu-grid">
-    <a class="menu-card" href="index.html">
+    <a class="menu-card" data-base="index.html" href="index.html">
       <span class="mc-name">正常监控模式</span>
-      <span class="mc-desc">默认模式：5 分钟自动轮播全部页面，使用 mock 数据模拟在厂状态与随机报警。</span>
+      <span class="mc-desc">默认模式：自动轮播全部页面（每页停留时长可选），使用 mock 数据模拟在厂状态与随机报警。</span>
+      <div class="mc-dwell-row">
+        <span class="mc-dwell-lbl">停留时长</span>
+        <select class="mc-dwell">
+          <option value="1">1 分钟</option><option value="2">2 分钟</option>
+          <option value="3">3 分钟</option><option value="4">4 分钟</option>
+          <option value="5" selected>5 分钟</option><option value="6">6 分钟</option>
+          <option value="8">8 分钟</option><option value="10">10 分钟</option>
+        </select>
+      </div>
       <span class="mc-url">index.html</span>
     </a>
-    <a class="menu-card" href="index.html?alarmRate=1">
+    <a class="menu-card" data-base="index.html?alarmRate=1" href="index.html?alarmRate=1">
       <span class="mc-name">报警演示模式</span>
       <span class="mc-desc">高概率触发报警，便于验收报警锁定、包络特写/巡航与底部报警信息条。</span>
+      <div class="mc-dwell-row">
+        <span class="mc-dwell-lbl">停留时长</span>
+        <select class="mc-dwell">
+          <option value="1">1 分钟</option><option value="2">2 分钟</option>
+          <option value="3">3 分钟</option><option value="4">4 分钟</option>
+          <option value="5" selected>5 分钟</option><option value="6">6 分钟</option>
+          <option value="8">8 分钟</option><option value="10">10 分钟</option>
+        </select>
+      </div>
       <span class="mc-url">index.html?alarmRate=1</span>
     </a>
-    <a class="menu-card" href="index.html?dwell=180000&amp;alarmRate=1">
+    <a class="menu-card" data-base="index.html?alarmRate=1" href="index.html?alarmRate=1">
       <span class="mc-name">快速轮播模式</span>
-      <span class="mc-desc">3 分钟轮播 + 报警演示：换页更频繁，适合快速观察跨页报警切换。</span>
-      <span class="mc-url">index.html?dwell=180000&amp;alarmRate=1</span>
+      <span class="mc-desc">自选较短停留时长（如 1-2 分钟）+ 报警演示：换页更频繁，适合快速观察跨页报警切换。</span>
+      <div class="mc-dwell-row">
+        <span class="mc-dwell-lbl">停留时长</span>
+        <select class="mc-dwell">
+          <option value="1">1 分钟</option><option value="2">2 分钟</option>
+          <option value="3">3 分钟</option><option value="4">4 分钟</option>
+          <option value="5" selected>5 分钟</option><option value="6">6 分钟</option>
+          <option value="8">8 分钟</option><option value="10">10 分钟</option>
+        </select>
+      </div>
+      <span class="mc-url">index.html?alarmRate=1</span>
     </a>
     <a class="menu-card" href="index.html?qa=1">
       <span class="mc-name">质检模式（QA）</span>
@@ -123,5 +170,52 @@
     </a>
   </div>
 </div>
+<script>
+(function () {
+  /* 三张非 QA 卡片共享一个停留时长偏好（与监控页同 key：buf.dwell）：
+   * 选择即持久化并同步全部卡片；点击卡片把所选时长以 ?dwell= 带入监控页。
+   * 监控页无 URL 参数时读同一 key。 */
+  var KEY = 'buf.dwell';
+  var OPTS = [1, 2, 3, 4, 5, 6, 8, 10]; // 分钟，与监控页胶囊一致
+  var selEls = document.querySelectorAll('.mc-dwell');
+  var cards = document.querySelectorAll('.menu-card[data-base]');
+  function storedMs() {
+    var v = null;
+    try { v = localStorage.getItem(KEY); } catch (e) {}
+    return v != null && isFinite(+v) && +v > 0 ? +v : 300000; // 非法/未存：默认 5 分钟
+  }
+  function nearestMin(ms) { // 存量值可能来自 URL 钳制（非整选项），取最接近选项
+    var best = 5, bd = Infinity;
+    for (var i = 0; i < OPTS.length; i++) {
+      var d = Math.abs(OPTS[i] * 60000 - ms);
+      if (d < bd) { bd = d; best = OPTS[i]; }
+    }
+    return best;
+  }
+  function renderDwell(min) {
+    for (var i = 0; i < selEls.length; i++) selEls[i].value = String(min);
+    for (var j = 0; j < cards.length; j++) {
+      var base = cards[j].getAttribute('data-base');
+      cards[j].setAttribute('href',
+        base + (base.indexOf('?') >= 0 ? '&' : '?') + 'dwell=' + min * 60000);
+      var u = cards[j].querySelector('.mc-url');
+      if (u) u.textContent = cards[j].getAttribute('href');
+    }
+  }
+  /* 选择行拦截点击，避免冒泡触发卡片跳转 */
+  var rows = document.querySelectorAll('.mc-dwell-row');
+  for (var r = 0; r < rows.length; r++) {
+    rows[r].addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); });
+  }
+  for (var s = 0; s < selEls.length; s++) {
+    selEls[s].addEventListener('change', function () {
+      var min = +this.value;
+      renderDwell(min);
+      try { localStorage.setItem(KEY, String(min * 60000)); } catch (e) {}
+    });
+  }
+  renderDwell(nearestMin(storedMs())); // 初始：共享监控页持久化值，默认 5 分钟
+})();
+</script>
 </body>
 </html>

@@ -51,3 +51,28 @@ test('报警→清空只重置一次 dwell，后续空 snapshot 不再重置', (
   t = 250000; c.activeAlarms([]);
   t = 400001; assert.equal(c.tick(), 3); // 100000+300000 到期即切，而非 250000+300000
 });
+test('setDwell 轮播中途改短：从当前页开始时刻起按新时长切页', () => {
+  let t = 0; const c = createCarousel({ pageCount: 4, dwell: 300000, now: () => t });
+  t = 120000; assert.equal(c.tick(), 0); // 未到 5 分钟，保持页 0
+  c.setDwell(60000);                     // 改 1 分钟：以页 0 开始时刻 0 起算
+  assert.equal(c.dwell(), 60000);
+  t = 120001; assert.equal(c.tick(), 1); // 已过 120000 ≥ 60000 → 下次 tick 立即切页
+  t = 180002; assert.equal(c.tick(), 2); // 页 1 从 120001 起 60000 到期再切
+});
+test('setDwell 不触发立即切页', () => {
+  let t = 0; const c = createCarousel({ pageCount: 4, dwell: 300000, now: () => t });
+  const seq = []; c.onTurn(i => seq.push(i));
+  t = 100000; assert.equal(c.tick(), 0);
+  c.setDwell(240000);                    // 已过 100000 < 240000：不该切页
+  assert.equal(c.tick(), 0);
+  assert.deepEqual(seq, []);             // 未发生任何切页事件
+  t = 240001; assert.equal(c.tick(), 1); // 0+240000 到期才切
+  assert.deepEqual(seq, [1]);
+});
+test('setDwell 非法值（0/负/非数）不生效', () => {
+  let t = 0; const c = createCarousel({ pageCount: 4, dwell: 300000, now: () => t });
+  c.setDwell(0); c.setDwell(-60000); c.setDwell(NaN);
+  assert.equal(c.dwell(), 300000);       // 保持原 dwell
+  t = 299999; assert.equal(c.tick(), 0);
+  t = 300001; assert.equal(c.tick(), 1); // 仍按 300000 节奏
+});

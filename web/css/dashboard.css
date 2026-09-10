@@ -30,7 +30,7 @@ body {
   font-size: 20px;
   letter-spacing: 1px;
   position: relative;
-  z-index: 2;
+  z-index: 3; /* 高于 #statusBar：内部 .dwell-menu 弹层需跨过状态条点击 */
 }
 /* §15 大字号标题：负 tracking + 紧 leading */
 #pageName { color: #7fd4ff; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
@@ -50,6 +50,57 @@ body {
 #menuLink:hover { border-color: #2f6ea5; background: rgba(47, 110, 165, 0.15); will-change: transform; }
 /* §1/§10 即时反馈：按下即刻 scale(0.97)，100ms ease-out */
 #menuLink:active { transform: scale(0.97); transition: transform 100ms ease-out; }
+
+/* 轮播停留时长设置（页头小胶囊 + 选项弹层：最轻材质小控件） */
+#dwellSlot { display: flex; align-items: center; }
+.dwell-ctl { position: relative; }
+.dwell-btn {
+  color: #8fb4d4;
+  font: 13px 'Noto Sans SC', 'Roboto Condensed', system-ui, sans-serif;
+  letter-spacing: 0.5px;
+  font-variant-numeric: tabular-nums;
+  background: rgba(18, 24, 34, 0.5);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid #14304f;
+  border-radius: 999px; /* 胶囊 */
+  padding: 3px 14px;
+  cursor: pointer;
+}
+.dwell-btn:hover { border-color: #2f6ea5; color: #cfe8ff; background: rgba(47, 110, 165, 0.15); will-change: transform; }
+/* §1/§10 即时反馈：按下即刻 scale(0.97)，100ms ease-out */
+.dwell-btn:active { transform: scale(0.97); transition: transform 100ms ease-out; }
+.dwell-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* 8 选项两列，紧凑弹层 */
+  gap: 2px;
+  min-width: 152px;
+  padding: 6px;
+  background: rgba(12, 18, 28, 0.9); /* 弹层底色更实，保证选项可读 */
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid #14304f;
+  border-radius: 8px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+  z-index: 6;
+}
+.dwell-menu.hidden { display: none; }
+.dwell-opt {
+  padding: 6px 0;
+  text-align: center;
+  color: #8fb4d4;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  font: 14px 'Noto Sans SC', 'Roboto Condensed', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.dwell-opt:hover { background: rgba(47, 110, 165, 0.28); color: #cfe8ff; }
+.dwell-opt.on { color: #7fd4ff; background: rgba(47, 110, 165, 0.2); font-weight: 700; }
 
 /* 页头下状态条（轻材质）：实时摘要 + 轮播状态 */
 #statusBar {
@@ -197,8 +248,8 @@ body {
 @media (prefers-reduced-motion: reduce) {
   #board .page { transition: opacity 200ms ease; transform: none !important; }
   #alarmBar { transition: opacity 200ms ease; }
-  #menuLink, #pager .pgBtn { transition: none; }
-  #menuLink:active, #pager .pgBtn:active { transform: none; }
+  #menuLink, #pager .pgBtn, .dwell-btn, .dwell-opt { transition: none; }
+  #menuLink:active, #pager .pgBtn:active, .dwell-btn:active, .dwell-opt:active { transform: none; }
   .alarm-pulse { animation: none; stroke: #ff2020; stroke-width: 3; } /* 静态红框 */
   #legend .sw-alarm { animation: none; border-color: #ff2020; border-width: 2px; }
 }
@@ -211,11 +262,12 @@ body {
     backdrop-filter: none;
   }
   #pager .pgBtn { background: #121a26; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .dwell-btn, .dwell-menu { background: #121a26; -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 
 /* prefers-contrast:more：控件加对比边框 */
 @media (prefers-contrast: more) {
-  #menuLink, #pager .pgBtn { border: 2px solid #9fdcff; }
+  #menuLink, #pager .pgBtn, .dwell-btn { border: 2px solid #9fdcff; }
   #hud, #statusBar { border-bottom-color: #9fdcff; }
   #legend { border-top-color: #9fdcff; }
   #alarmBar { border-top-color: #ff6060; }

@@ -6,8 +6,8 @@
  */
 window.BUF_CONFIG = {
   dwell: 300000,
-  minDwell: 180000,
-  maxDwell: 360000,
+  minDwell: 60000,    // 1 分钟：覆盖界面/菜单停留时长选项下限
+  maxDwell: 600000,   // 10 分钟：覆盖界面/菜单停留时长选项上限
   manualRecovery: 60000,
   cruiseInterval: 20000
 };
