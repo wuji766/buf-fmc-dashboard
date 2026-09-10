@@ -59,6 +59,11 @@
 
 ## 第二步：浏览器监控大屏（2026-08-31）
 
+**在线访问**：https://wuji766.github.io/buf-fmc-dashboard/menu.html （GitHub Pages，gh-pages 分支 = web/ 内容）
+**本地访问**：双击 web/menu.html
+**更新线上站点**：改完 web/ 后 git worktree add .ghpages gh-pages（已存在则直接进入），同步文件到 .ghpages 根目录后 git add -A && git commit && git -c http.proxy=http://127.0.0.1:7897 push（GitHub 需走本机代理）。
+
+
 ### 运行方式
 - 测试：项目根目录运行 `node --test`（全部单测）。
 - 打开 `web/menu.html` 选择运行模式（正常监控 / 报警演示 / 快速轮播 / QA 质检，卡片点击进入；免构建、免服务器，数据为 mock 引擎）。也可直接双击 `web/index.html` 进入正常监控模式。建议用 Chrome/Edge。
