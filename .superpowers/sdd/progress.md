@@ -16,3 +16,4 @@ Feedback round 5: complete (320cdf2) - menu.html 模式索引页 + rAF 报警条
 Apple Design polish: complete (ac986a4 + 4de6d23, tests 27/27, CDP browser QA 29/29) - springs/gestures/materials/typography/a11y; 前一实现者限额中断由新代理接续
 Publish: main+gh-pages pushed to github.com/wuji766/buf-fmc-dashboard, Pages live at https://wuji766.github.io/buf-fmc-dashboard/menu.html; dwell configurable (6f58b5f)
 Dwell options v2: 1min/30s/15s/5s (c51f8b9 main + 686e819 gh-pages, online verified)
+Fix: menu 5s dwell clamped to 1min by cached old config.js minDwell=60000. Fixed with hard clamp [1s,1h] in main.js + asset versioning ?v=20260901a (main 6316fc3, gh-pages 9688ce3, online verified)
