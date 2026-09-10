@@ -126,10 +126,8 @@
       <div class="mc-dwell-row">
         <span class="mc-dwell-lbl">停留时长</span>
         <select class="mc-dwell">
-          <option value="1">1 分钟</option><option value="2">2 分钟</option>
-          <option value="3">3 分钟</option><option value="4">4 分钟</option>
-          <option value="5" selected>5 分钟</option><option value="6">6 分钟</option>
-          <option value="8">8 分钟</option><option value="10">10 分钟</option>
+          <option value="60" selected>1 分钟</option><option value="30">30 秒</option>
+          <option value="15">15 秒</option><option value="5">5 秒</option>
         </select>
       </div>
       <span class="mc-url">index.html</span>
@@ -140,24 +138,20 @@
       <div class="mc-dwell-row">
         <span class="mc-dwell-lbl">停留时长</span>
         <select class="mc-dwell">
-          <option value="1">1 分钟</option><option value="2">2 分钟</option>
-          <option value="3">3 分钟</option><option value="4">4 分钟</option>
-          <option value="5" selected>5 分钟</option><option value="6">6 分钟</option>
-          <option value="8">8 分钟</option><option value="10">10 分钟</option>
+          <option value="60" selected>1 分钟</option><option value="30">30 秒</option>
+          <option value="15">15 秒</option><option value="5">5 秒</option>
         </select>
       </div>
       <span class="mc-url">index.html?alarmRate=1</span>
     </a>
     <a class="menu-card" data-base="index.html?alarmRate=1" href="index.html?alarmRate=1">
       <span class="mc-name">快速轮播模式</span>
-      <span class="mc-desc">自选较短停留时长（如 1-2 分钟）+ 报警演示：换页更频繁，适合快速观察跨页报警切换。</span>
+      <span class="mc-desc">自选较短停留时长（如 15-30 秒）+ 报警演示：换页更频繁，适合快速观察跨页报警切换。</span>
       <div class="mc-dwell-row">
         <span class="mc-dwell-lbl">停留时长</span>
         <select class="mc-dwell">
-          <option value="1">1 分钟</option><option value="2">2 分钟</option>
-          <option value="3">3 分钟</option><option value="4">4 分钟</option>
-          <option value="5" selected>5 分钟</option><option value="6">6 分钟</option>
-          <option value="8">8 分钟</option><option value="10">10 分钟</option>
+          <option value="60">1 分钟</option><option value="30" selected>30 秒</option>
+          <option value="15">15 秒</option><option value="5">5 秒</option>
         </select>
       </div>
       <span class="mc-url">index.html?alarmRate=1</span>
@@ -176,28 +170,30 @@
    * 选择即持久化并同步全部卡片；点击卡片把所选时长以 ?dwell= 带入监控页。
    * 监控页无 URL 参数时读同一 key。 */
   var KEY = 'buf.dwell';
-  var OPTS = [1, 2, 3, 4, 5, 6, 8, 10]; // 分钟，与监控页胶囊一致
+  var OPTS = [60, 30, 15, 5]; // 秒，与监控页胶囊一致
   var selEls = document.querySelectorAll('.mc-dwell');
   var cards = document.querySelectorAll('.menu-card[data-base]');
   function storedMs() {
     var v = null;
     try { v = localStorage.getItem(KEY); } catch (e) {}
-    return v != null && isFinite(+v) && +v > 0 ? +v : 300000; // 非法/未存：默认 5 分钟
+    return v != null && isFinite(+v) && +v > 0 ? +v : 60000; // 非法/未存：默认 1 分钟
   }
-  function nearestMin(ms) { // 存量值可能来自 URL 钳制（非整选项），取最接近选项
-    var best = 5, bd = Infinity;
+  function nearestSec(ms) { // 存量值可能来自 URL 钳制（非整选项），取最接近选项
+    var best = 60, bd = Infinity;
     for (var i = 0; i < OPTS.length; i++) {
-      var d = Math.abs(OPTS[i] * 60000 - ms);
+      var d = Math.abs(OPTS[i] * 1000 - ms);
       if (d < bd) { bd = d; best = OPTS[i]; }
     }
     return best;
   }
-  function renderDwell(min) {
-    for (var i = 0; i < selEls.length; i++) selEls[i].value = String(min);
+  function renderDwell(sec) {
+    for (var i = 0; i < selEls.length; i++) {
+      if (selEls[i].querySelector('option[value="' + sec + '"]')) selEls[i].value = String(sec);
+    }
     for (var j = 0; j < cards.length; j++) {
       var base = cards[j].getAttribute('data-base');
       cards[j].setAttribute('href',
-        base + (base.indexOf('?') >= 0 ? '&' : '?') + 'dwell=' + min * 60000);
+        base + (base.indexOf('?') >= 0 ? '&' : '?') + 'dwell=' + sec * 1000);
       var u = cards[j].querySelector('.mc-url');
       if (u) u.textContent = cards[j].getAttribute('href');
     }
@@ -209,12 +205,12 @@
   }
   for (var s = 0; s < selEls.length; s++) {
     selEls[s].addEventListener('change', function () {
-      var min = +this.value;
-      renderDwell(min);
-      try { localStorage.setItem(KEY, String(min * 60000)); } catch (e) {}
+      var sec = +this.value;
+      renderDwell(sec);
+      try { localStorage.setItem(KEY, String(sec * 1000)); } catch (e) {}
     });
   }
-  renderDwell(nearestMin(storedMs())); // 初始：共享监控页持久化值，默认 5 分钟
+  renderDwell(nearestSec(storedMs())); // 初始：共享监控页持久化值，默认 1 分钟
 })();
 </script>
 </body>
