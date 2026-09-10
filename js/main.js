@@ -2,9 +2,9 @@
 (function () {
   var CFG = window.BUF_CONFIG || {};
   function cfg(name, def) { return CFG[name] != null ? CFG[name] : def; }
-  var DWELL = cfg('dwell', 300000);       // 自动换页间隔（config.js 可调）
-  var MIN_DWELL = cfg('minDwell', 180000);
-  var MAX_DWELL = cfg('maxDwell', 360000);
+  var DWELL = cfg('dwell', 60000);        // 自动换页间隔（config.js 可调）
+  var MIN_DWELL = cfg('minDwell', 5000);
+  var MAX_DWELL = cfg('maxDwell', 600000);
   var MANUAL_HOLD = cfg('manualRecovery', 60000);
   var CRUISE_INTERVAL = cfg('cruiseInterval', 20000);
   var DATA_INTERVAL = 2000;               // 数据刷新间隔 2s
@@ -108,10 +108,10 @@
 
   /* 页头停留时长设置胶囊（?qa=1 时 main.js 已早退，本控件不渲染）
    * 选项固定分钟数，选择后立即生效并持久化到 localStorage(buf.dwell) */
-  var DWELL_OPTIONS = [1, 2, 3, 4, 5, 6, 8, 10]; // 分钟
+  var DWELL_OPTIONS = [60, 30, 15, 5]; // 秒
   function dwellLabel(ms) {
-    var m = ms / 60000;
-    return '轮播 ' + (m % 1 === 0 ? m : m.toFixed(1)) + ' 分钟';
+    var s = Math.round(ms / 1000);
+    return '轮播 ' + (s >= 60 ? (s / 60) + ' 分钟' : s + ' 秒');
   }
   function buildDwellCtl() {
     var slot = document.getElementById('dwellSlot');
@@ -125,14 +125,14 @@
     btn.textContent = dwellLabel(DWELL);
     var pop = document.createElement('div');
     pop.className = 'dwell-menu hidden';
-    DWELL_OPTIONS.forEach(function (m) {
+    DWELL_OPTIONS.forEach(function (s) {
       var ob = document.createElement('button');
       ob.type = 'button';
-      ob.className = 'dwell-opt' + (m * 60000 === DWELL ? ' on' : '');
-      ob.textContent = m + ' 分钟';
+      ob.className = 'dwell-opt' + (s * 1000 === DWELL ? ' on' : '');
+      ob.textContent = s >= 60 ? (s / 60) + ' 分钟' : s + ' 秒';
       ob.onclick = function (ev) {
         ev.stopPropagation();
-        DWELL = m * 60000;
+        DWELL = s * 1000;
         carousel.setDwell(DWELL);          // 立即生效：当前页开始时刻起按新时长
         try { localStorage.setItem(DWELL_KEY, String(DWELL)); } catch (e) {}
         btn.textContent = dwellLabel(DWELL);
